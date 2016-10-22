@@ -16,6 +16,7 @@
 #define S1_WARMBOOT_TOOL      (0x7001)
 #define S1_WARMBOOT_RECOVERY  (0x7711)
 #define S1_WARMBOOT_FOTA      (0x6F46)
+#define S1_WARMBOOT_FOTA_CACHE (0x6F50)
 
 extern void write_magic(volatile unsigned long magic_write, int log_option);
 #endif

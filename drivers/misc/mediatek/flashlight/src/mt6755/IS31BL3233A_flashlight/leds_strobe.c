@@ -29,9 +29,14 @@
 #include <linux/mutex.h>
 #include <linux/i2c.h>
 #include <linux/leds.h>
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 #include <linux/kthread.h>
 #endif
+//CEI comments end
+//CEI comments start
+
 #include <mt-plat/mt_gpio.h>
 #include <mt-plat/mt_gpio_core.h>
 #include <mach/gpio_const.h>
@@ -73,13 +78,25 @@
 ******************************************************************************/
 
 static DEFINE_SPINLOCK(g_strobeSMPLock);	/* cotta-- SMP proection */
+//CEI comments tart
+
 static DEFINE_SPINLOCK(g_strobe);
+//CEI comments end
+//CEI comments start
+
 static u32 strobe_Res;
 static u32 strobe_Timeus;
 static BOOL g_strobe_On;
+//CEI comments end
+
+//CEI comments tart
+
+//CEI comments start
 
 static int g_led_state = 0;
 int g_duty=-1;
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 struct task_struct *flashlight_thread_handle = NULL;
 static unsigned long flags;
@@ -89,20 +106,31 @@ int g_idle_cpu = -1;
 static struct hrtimer g_timeOutTimer;
 static struct work_struct workTimeOut;
 #endif
+//CEI comments end
+//CEI comments end
+//CEI comments end
 static int g_timeOutTimeMs=0;
 
 static DEFINE_MUTEX(g_strobeSem);
 
 /* #define FLASH_GPIO_ENF GPIO12 */
 /* #define FLASH_GPIO_ENT GPIO13 */
+//CEI comments start
+
+//CEI comments start
+
 //#define GPIO_ENF GPIO_FLASH_LED_EN
 //#define GPIO_ENM GPIO_TORCH_EN
 #define GPIO_ENF 8
 #define GPIO_ENM 9
+//CEI comments end
+//CEI comments end
 
 /*****************************************************************************
 Functions
 *****************************************************************************/
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 int flashlight_kthread(void *x);
 #else
@@ -111,18 +139,32 @@ static void work_timeOutFunc(struct work_struct *data);
 //CEI comments end
 int FL_preOn(void)
 {
+    //CEI comments tart
+    
+    //CEI comments start
+    
+    //CEI comments start
+    
     printk("[IS31BL3233A]g_led_state=%d, g_duty=%d\n", g_led_state, g_duty);
     return 0;
+	//CEI comments end
+    //CEI comments end
+    //CEI comments end
 }
 
 int FL_Enable(void)
 {
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 	int i = 0;
+    //CEI comments start
+    
     if (g_duty > 0)
         g_led_state = 2;
     else
         g_led_state = 1;
+    //CEI comments end
 
     printk("[IS31BL3233A]FL_Enable g_led_state=%d, g_timeOutTimeMs=%d\n", g_led_state, g_timeOutTimeMs);
 
@@ -132,49 +174,85 @@ int FL_Enable(void)
 				g_idle_cpu = i;
 			}
 		}
+    //CEI comments start
+    
         wake_up_process(flashlight_thread_handle);
    	} else if (g_led_state == 1) {
    	    mt_set_gpio_out(GPIO_ENM, GPIO_OUT_ONE);
+    //CEI comments end
    	}
 #else
+    //CEI comments tart
+    
+    //CEI comments start
+    
+    //CEI comments start
+    
+    //Move torch enable code here to match calling procedure.
 
 	ktime_t ktime;
 
+    //CEI comments start
+    
+    //CEI comments start
+    
+    //CEI comments start
+    
     if (g_duty > 0)
         g_led_state = 2;
     else
         g_led_state = 1;
+    //CEI comments end
 	
     printk("[IS31BL3233A]FL_Enable g_led_state=%d, g_timeOutTimeMs=%d\n", g_led_state, g_timeOutTimeMs);
 
+    //CEI comments end
+    //CEI comments end
 	ktime = ktime_set(0, g_timeOutTimeMs * 1000);
     hrtimer_start(&g_timeOutTimer, ktime, HRTIMER_MODE_REL);
 
     printk("[IS31BL3233A]FL_Enable g_led_state=%d, g_duty=%d\n", g_led_state, g_duty);
+    //CEI comments end
+    //CEI comments end
+    //CEI comments end
 #endif
+//CEI comments end
 	return 0;
 }
 
 int FL_Disable(void)
 {
+    //CEI comments tart
+    
     if (g_led_state == 1) {
         mt_set_gpio_out(GPIO_ENM, GPIO_OUT_ZERO);		
 	}
     g_led_state = 0;
     g_duty = -1;
+//CEI comments start
+
 #ifndef FLASHLIGHT_TIMING_FIX
     if (g_timeOutTimeMs != 0) {
         hrtimer_cancel(&g_timeOutTimer);
         g_timeOutTimeMs = 0;
 	}
 #endif
+//CEI comments end
+    //CEI comments end
+    //CEI comments start
+    
     printk("[IS31BL3233A]FL_Disable g_led_state=%d, g_duty=%d\n", g_led_state, g_duty);
+    //CEI comments end
 
 	return 0;
 }
 
 int FL_dim_duty(kal_uint32 duty)
 {
+    //CEI comments tart
+    
+    //CEI comments start
+    
     printk("[IS31BL3233A]duty=%u, g_duty=%d\n", duty, g_duty);
 
 	if (duty == 0) {
@@ -183,16 +261,23 @@ int FL_dim_duty(kal_uint32 duty)
 	    g_duty = (duty > 6) ? 6 : duty;
 }
 	printk("[IS31BL3233A]g_duty=%d, g_led_state=%d\n", g_duty, g_led_state);
+	//CEI comments end
+    //CEI comments end
 	return 0;
 }
 
 
 int FL_Init(void)
 {
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX    
 	int err;
 #endif
+//CEI comments end
     //int i=0;
+    //CEI comments start
+    
     if(mt_set_gpio_mode(GPIO_ENF,GPIO_MODE_00)){printk("[IS31BL3233A _flashlight] set gpio mode failed!! \n");}
     if(mt_set_gpio_dir(GPIO_ENF,GPIO_DIR_OUT)){printk("[IS31BL3233A _flashlight] set gpio dir failed!! \n");}
     if(mt_set_gpio_out(GPIO_ENF,GPIO_OUT_ZERO)){printk("[IS31BL3233A _flashlight] set gpio failed!! \n");}
@@ -200,6 +285,8 @@ int FL_Init(void)
     if(mt_set_gpio_mode(GPIO_ENM,GPIO_MODE_00)){printk("[IS31BL3233A _flashlight] set gpio mode failed!! \n");}
     if(mt_set_gpio_dir(GPIO_ENM,GPIO_DIR_OUT)){printk("[IS31BL3233A _flashlight] set gpio dir failed!! \n");}
     if(mt_set_gpio_out(GPIO_ENM,GPIO_OUT_ZERO)){printk("[IS31BL3233A _flashlight] set gpio failed!! \n");}
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 	if (flashlight_thread_handle == NULL)
 	    flashlight_thread_handle = kthread_create(flashlight_kthread, (void *)NULL, "flashlight_thread");
@@ -210,7 +297,9 @@ int FL_Init(void)
         return err;  
 	}
 #endif
+//CEI comments end
     printk("[IS31BL3233A]FL_Init line=%d\n",__LINE__);
+    //CEI comments end
 	return 0;
 }
 
@@ -219,13 +308,19 @@ int FL_Uninit(void)
 {
     mt_set_gpio_out(GPIO_ENF, GPIO_OUT_ZERO);
     mt_set_gpio_out(GPIO_ENM, GPIO_OUT_ZERO);
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 	if (flashlight_thread_handle) {
 	    kthread_stop(flashlight_thread_handle);
 	    flashlight_thread_handle = NULL;
 	}
 #endif
+//CEI comments end
+    //CEI comments start
+    
 	printk("[IS31BL3233A]FL_Uninit line=%d\n", __LINE__);
+    //CEI comments end
 	return 0;
 }
 
@@ -237,11 +332,16 @@ int FL_hasLowPowerDetect(void)
 /*****************************************************************************
 User interface
 *****************************************************************************/
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 int flashlight_kthread(void *x)
 {
 	unsigned int cycle = 0, hightime = 0, lowtime = 0;
+    //CEI comments start
+    
 	int i = 0, ret = 0, old_idle_cpu = -1;
+    //CEI comments end
 
     while (1) {
 		set_current_state(TASK_UNINTERRUPTIBLE);
@@ -289,11 +389,14 @@ int flashlight_kthread(void *x)
             }
             spin_unlock_irqrestore(&g_strobe, flags);		
             //printk("[IS31BL3233A]%s: flash\n", __func__);
+        //CEI comments start
+        
         //} else if (g_led_state == 1 && torch_set == 0) {	        
         //    mt_set_gpio_out(GPIO_ENM, GPIO_OUT_ONE);
         //    torch_set = 1;
         //    printk("[IS31BL3233A]%s: torch\n", __func__);
         //} else {
+        //CEI comments end
        	} else if (g_led_state == 0) {
              g_idle_cpu = -1;
              schedule_timeout(HZ);
@@ -304,6 +407,8 @@ int flashlight_kthread(void *x)
 #else
 static void work_timeOutFunc(struct work_struct *data)
 {
+    //CEI comments tart
+    
     unsigned int cycle = 0, hightime = 0, lowtime = 0;
     int i = 0;
     if (g_led_state == 2) {
@@ -311,7 +416,13 @@ static void work_timeOutFunc(struct work_struct *data)
         hightime = (40 + g_duty * 10) << 1;
         lowtime = 200 - hightime;
         spin_lock_irq(&g_strobe);
+        //CEI comments start
+        
+        //CEI comments start
+        
         for (i = 0; i < cycle && g_led_state == 2; i++) {
+        //CEI comments end
+        //CEI comments end
             mt_set_gpio_out(GPIO_ENF, GPIO_OUT_ONE);
             udelay(hightime);
             mt_set_gpio_out(GPIO_ENF, GPIO_OUT_ZERO);
@@ -321,6 +432,7 @@ static void work_timeOutFunc(struct work_struct *data)
     } else if (g_led_state == 1) {
         mt_set_gpio_out(GPIO_ENM, GPIO_OUT_ONE);
     }
+    //CEI comments end
 }
 
 enum hrtimer_restart ledTimeOutCallback(struct hrtimer *timer)
@@ -341,8 +453,11 @@ void timerInit(void)
     }
 }
 #endif
+//CEI comments end
 static int constant_flashlight_ioctl(unsigned int cmd, unsigned long arg)
 {
+    //CEI comments start
+    
     //For FLASH_IOC_GET_PRE_ON_TIME_MS
     int temp;
 	int i4RetValue = 0;
@@ -377,6 +492,8 @@ static int constant_flashlight_ioctl(unsigned int cmd, unsigned long arg)
         printk("[IS31BL3233A]FLASH_IOC_PRE_ON: %d\n", (int)arg);
         FL_preOn();
         break;
+    //CEI comments tart
+    
     case FLASH_IOC_GET_PRE_ON_TIME_MS_DUTY:
 		printk("[IS31BL3233A]FLASH_IOC_GET_PRE_ON_TIME_MS_DUTY: %d\n",(int)arg);
         i4RetValue= g_duty;
@@ -386,6 +503,7 @@ static int constant_flashlight_ioctl(unsigned int cmd, unsigned long arg)
     case FLASH_IOC_GET_PRE_ON_TIME_MS:
         printk("[IS31BL3233A]FLASH_IOC_GET_PRE_ON_TIME_MS: %d\n",(int)arg);
         i4RetValue= g_timeOutTimeMs;		
+    //CEI comments end		
 		break;
 
 	case FLASH_IOC_SET_ONOFF:
@@ -413,6 +531,7 @@ static int constant_flashlight_ioctl(unsigned int cmd, unsigned long arg)
 		i4RetValue = -EPERM;
 		break;
 	}
+    //CEI comments end
 	return i4RetValue;
 }
 
@@ -422,13 +541,18 @@ static int constant_flashlight_ioctl(unsigned int cmd, unsigned long arg)
 static int constant_flashlight_open(void *pArg)
 {
 	int i4RetValue = 0;
+    //CEI comments start
+    
 	printk("[IS31BL3233A]constant_flashlight_open line=%d\n", __LINE__);
 
 	if (0 == strobe_Res) {
 		FL_Init();
+//CEI comments start
+
 #ifndef FLASHLIGHT_TIMING_FIX
 		timerInit();
 #endif
+//CEI comments end
 	}
 	printk("[IS31BL3233A]constant_flashlight_open line=%d\n", __LINE__);
 	spin_lock_irq(&g_strobeSMPLock);
@@ -444,6 +568,7 @@ static int constant_flashlight_open(void *pArg)
 
 	spin_unlock_irq(&g_strobeSMPLock);
 	printk("[IS31BL3233A]constant_flashlight_open line=%d\n", __LINE__);
+    //CEI comments end
 	return i4RetValue;
 
 }
@@ -451,6 +576,8 @@ static int constant_flashlight_open(void *pArg)
 
 static int constant_flashlight_release(void *pArg)
 {
+    //CEI comments start
+    
 	printk("[IS31BL3233A]constant_flashlight_release\n");
 
 	if (strobe_Res) {
@@ -468,6 +595,7 @@ static int constant_flashlight_release(void *pArg)
 	}
 
 	printk("[IS31BL3233A]Done\n");
+    //CEI comments end
 
 	return 0;
 
@@ -497,3 +625,4 @@ ssize_t strobe_VDIrq(void)
 	return 0;
 }
 EXPORT_SYMBOL(strobe_VDIrq);
+//CEI comments end

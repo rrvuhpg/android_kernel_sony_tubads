@@ -227,8 +227,8 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		}
 	}
 
-//Trigger LMK when free size < 80M and cache size < 350M
-	if (other_free < 20480 && other_file < 89600) {
+//Trigger LMK when free size < 180M and cache size < 450M
+	if (other_free < 46080 && other_file < 115200) {
 		if (min_score_adj != 0) {
 			min_score_adj = lowmem_adj[0] + 1;
 		}

@@ -1950,6 +1950,289 @@ PMU_STATUS BAT_BatteryStatusFailAction(void)
 	return PMU_STATUS_OK;
 }
 
+//CEI comment start//
+//Add more charing related logs
+int fgr = -1;
+int f_rname = 0;
+extern void fgr_get(int fgr);
+extern int get_FG_Current(void);
+extern int data_log_level;
+extern int fg_w_avg_delta;
+
+int calc_fgr(void)
+{
+	int ret_car = 117;
+	int w_avg_delta = fg_w_avg_delta;
+
+	if ( (w_avg_delta >= 7) && (w_avg_delta < 10) )
+		ret_car = 110;
+	if ( (w_avg_delta >= 10) && (w_avg_delta < 13) )
+		ret_car = 107;
+	else if ( (w_avg_delta >= 13) && (w_avg_delta < 16) )
+		ret_car = 104;
+	else if ( w_avg_delta >= 16 )
+		ret_car = 101;
+
+	return ret_car;
+}
+
+//=========//
+#define SWITCHING_THR (7)
+#define SAMPLE_NUM (180)
+#define DATA_FILTER_MAX (1950)
+#define DATA_FILTER_MIN (550)
+#define BQ_SCALE (50)
+#define BQ_CASE_NUM ((DATA_FILTER_MAX / BQ_SCALE) + 1)
+#define FILTER_VAL (30)
+#define VALID_SAMPLE_NUM (80)
+#define VALID_BQ_CASE_SAMPLE_NUM (6)
+#define IGN_SAMPLE_NUM (5)
+
+int bq_sample[SAMPLE_NUM] = {0};
+int fg_sample[SAMPLE_NUM] = {0};
+int sample_idx = 0;
+
+int fg_w_avg_delta = 0;
+int fg_avg_delta = 0;
+int fg_check_status = 0;
+int fg_n_case = 0;
+int fg_a_case = 0;
+
+int calculate_delta(void)
+{
+	int bq_case_sample[SAMPLE_NUM] = {0};
+	int fg_delta[BQ_CASE_NUM] = {0};
+	int fg_delta_idx[BQ_CASE_NUM] = {0};
+	int bq_case_i = 0;
+	int bq_i = 0, fg_i = 0;
+	int sort_i = 0, sort_j = 0, sort_tmp_val = 0;
+	int avg_delta_idx = 0;
+	int valid_sample = 0;
+	int fg_check_state = 0;
+	int ign_sample = 0;
+
+	battery_log(BAT_LOG_FULL, "CHIHI(K)=> calculate_delta() enter\n");
+
+	sample_idx = 0;
+	fg_avg_delta = 0;
+	fg_w_avg_delta = 0;
+
+	for (bq_case_i = 0; bq_case_i < BQ_CASE_NUM; bq_case_i ++)
+	{
+		fg_delta[bq_case_i] = 0;
+		fg_delta_idx[bq_case_i]=0;
+		for (bq_i = 0; bq_i < SAMPLE_NUM; bq_i ++)
+		{
+			if ((bq_sample[bq_i] / BQ_SCALE) == bq_case_i)
+			{
+				bq_case_sample[fg_delta_idx[bq_case_i]] = fg_sample[bq_i];
+				fg_delta_idx[bq_case_i] ++;
+			}
+		}
+
+		if (fg_delta_idx[bq_case_i] < 1)
+		{
+			continue;
+		}
+
+		for (sort_i = 0; sort_i < (fg_delta_idx[bq_case_i] - 1); sort_i ++)
+		{
+			for(sort_j = (sort_i + 1); sort_j < (fg_delta_idx[bq_case_i]); sort_j++)
+			{
+				if (bq_case_sample[sort_j] < bq_case_sample[sort_i])
+				{
+					sort_tmp_val = bq_case_sample[sort_i];
+					bq_case_sample[sort_i] = bq_case_sample[sort_j];
+					bq_case_sample[sort_j] = sort_tmp_val;
+				}
+			}
+		}
+
+		for( fg_i = fg_delta_idx[bq_case_i]; fg_i < (((fg_delta_idx[bq_case_i] + 9) / 10) * 10); fg_i ++)
+		{
+			bq_case_sample[fg_i] = -1;
+		}
+		for( fg_i = 0; fg_i < ((fg_delta_idx[bq_case_i] + 9) / 10); fg_i ++)
+		{
+			battery_log(BAT_LOG_FULL, "CHIHI(K)=> %4d %4d %4d %4d %4d %4d %4d %4d %4d %4d \n",
+				bq_case_sample[fg_i * 10], bq_case_sample[fg_i * 10 + 1], bq_case_sample[fg_i * 10 + 2], bq_case_sample[fg_i * 10 + 3], bq_case_sample[fg_i * 10 + 4],
+				bq_case_sample[fg_i * 10 + 5], bq_case_sample[fg_i * 10 + 6], bq_case_sample[fg_i * 10 + 7], bq_case_sample[fg_i * 10 + 8], bq_case_sample[fg_i * 10 + 9]);
+		}
+
+		if (fg_delta_idx[bq_case_i] >= VALID_BQ_CASE_SAMPLE_NUM)
+		{
+			ign_sample = ((fg_delta_idx[bq_case_i] * IGN_SAMPLE_NUM) / 100);
+			for( fg_i = ign_sample; fg_i < (fg_delta_idx[bq_case_i] - ign_sample); fg_i ++)
+			{
+				fg_delta[bq_case_i] += (bq_case_sample[fg_i] - (BQ_SCALE * bq_case_i));
+				valid_sample ++;
+			}
+			fg_delta[bq_case_i] = (((fg_delta[bq_case_i] * 100) / (fg_delta_idx[bq_case_i] - (ign_sample * 2))) / (BQ_SCALE * bq_case_i));
+			fg_avg_delta += fg_delta[bq_case_i]; 
+			fg_w_avg_delta += (fg_delta[bq_case_i] * (fg_delta_idx[bq_case_i] - (ign_sample * 2)));
+			avg_delta_idx ++;
+			battery_log(BAT_LOG_FULL, "CHIHI(K)=> bq:%d sample=%d ign_sample:%d fg_delta:%d fg_w_delta:%d (delta:%d, w_elta:%d)\n", (int)(BQ_SCALE * bq_case_i), fg_delta_idx[bq_case_i], ign_sample, fg_delta[bq_case_i], (fg_delta[bq_case_i] * (fg_delta_idx[bq_case_i] - (ign_sample * 2))), fg_avg_delta, fg_w_avg_delta);
+		}
+		else
+		{
+			fg_delta[bq_case_i] = 0;
+			battery_log(BAT_LOG_FULL, "CHIHI(K)=> bq:%d sample=%d Ignore! \n", (int)(BQ_SCALE * bq_case_i), fg_delta_idx[bq_case_i]);
+		}
+	}
+
+	battery_log(BAT_LOG_FULL, "CHIHI(K)=> avg_delta:%d (delta:%d index:%d) \n", (fg_avg_delta / avg_delta_idx), fg_avg_delta, avg_delta_idx);
+	battery_log(BAT_LOG_FULL, "CHIHI(K)=> w_avg_delta:%d (w_delta:%d valid_sample:%d) \n", (fg_w_avg_delta / valid_sample), fg_w_avg_delta, valid_sample);
+	if( valid_sample >= VALID_SAMPLE_NUM && avg_delta_idx > 0 )
+	{
+		fg_avg_delta = fg_avg_delta / avg_delta_idx;
+		fg_w_avg_delta = fg_w_avg_delta / valid_sample;
+		if( fg_w_avg_delta >= SWITCHING_THR )
+		{
+			fg_check_state = 2;
+			fg_a_case ++;
+			battery_log(BAT_LOG_FULL, "CHIHI(K)=> Average(W) Delta:%d [a] (n:%d, a:%d) delta:%d\n", fg_w_avg_delta, fg_n_case, fg_a_case, fg_avg_delta);
+		}
+		else
+		{
+			fg_check_state = 1;
+			fg_n_case ++;
+			battery_log(BAT_LOG_FULL, "CHIHI(K)=> Average(W) Delta:%d [n] (n:%d, a:%d) delta:%d\n", fg_w_avg_delta, fg_n_case, fg_a_case, fg_avg_delta);
+		}
+	}
+	else
+	{
+		battery_log(BAT_LOG_FULL, "CHIHI(K)=> Ignore!  \n");
+	}
+
+	battery_log(BAT_LOG_FULL, "CHIHI(K)=> calculate_delta() leave\n");
+	return (fg_check_state);
+
+}
+
+int delta_checking(int bq, int fg)
+{
+	int s_data = 0, l_data = 0;
+	int fg_check_state = 0;
+
+	battery_log(BAT_LOG_FULL, "CHIH(K)=> delta_checking() enter: bq=%d, fg=%d\n", bq, fg);
+
+	if (fg >= 0 || bq <= 0)
+	{
+		battery_log(BAT_LOG_FULL, "CHIH(K)=> delta_checking() discharging\n");
+		return (fg_check_state);
+	}
+
+	if (bq > DATA_FILTER_MAX || bq < DATA_FILTER_MIN )
+	{
+		battery_log(BAT_LOG_FULL, "CHIH(K)=> delta_checking() Invalid data! (bq > %d or bq < %d)\n", (int)((DATA_FILTER_MAX)-(BQ_SCALE)), (int)(DATA_FILTER_MIN));
+		return (fg_check_state);
+	}
+
+	fg = abs(fg);
+	if (bq < fg)
+	{
+		s_data = bq;
+		l_data = fg;
+	}
+	else
+	{
+		s_data = fg;
+		l_data = bq;
+	}
+	if ((s_data * (100 + FILTER_VAL)) < (l_data * 100))
+	{
+		battery_log(BAT_LOG_FULL, "CHIH(K)=> delta_checking() Invalid data! (delta > %d \n", (int)(FILTER_VAL));
+		return (fg_check_state);
+	}
+
+	bq_sample[sample_idx] = bq;
+	fg_sample[sample_idx] = fg;
+	sample_idx ++;
+	battery_log(BAT_LOG_FULL, "CHIH(K)=> delta_checking() valid data! bq=%d, fg=%d sample_idx:%d\n", bq, fg, sample_idx);
+
+	if (sample_idx >= SAMPLE_NUM)
+	{
+		fg_check_state = calculate_delta();
+	}
+
+	return (fg_check_state);
+
+}
+
+extern int get_fcr(void);
+extern int cat_rtc_info(void);
+extern int echo_rtc_info(int val);
+extern int car_value_rtc;
+extern int car_value_rtc_post;
+
+void dump_chg_data(void)
+{
+	unsigned int chg_data = 0;
+	int f_data_signed = 0;
+	static int cat_rtc_value = 0;
+
+	battery_charging_control(CHARGING_CMD_DUMP_REGISTER_GET_DATA, &chg_data);
+
+	if ((data_log_level != 0) && (fgr == -1))
+	{
+		if(car_value_rtc != 0)
+		{
+			//Could be marked later: S
+			//f_data_signed = get_FG_Current()/10;
+			//battery_log(BAT_LOG_CRTI, "LE(K)=> APTB(A) fcr=%d, cat_rtc_value=%d, value_rtc=%d, val rtc post=%d, bq=%d, fg=%d\n", get_fcr(), cat_rtc_value, car_value_rtc, car_value_rtc_post, chg_data, f_data_signed);
+			//Could be marked later: E
+		}
+		else
+		{
+			f_data_signed = get_FG_Current()/10;
+
+			fg_check_status = delta_checking(chg_data, f_data_signed);
+			battery_log(BAT_LOG_FULL, "LE(K)=> APTB(B) data_log_level=%d, fg_check_status=%d, f_rname=%d, fgr=%d, fcr=%d, cat_rtc_value=%d, value_rtc=%d, val rtc post=%d\n", data_log_level, fg_check_status, f_rname, fgr, get_fcr(), cat_rtc_value, car_value_rtc, car_value_rtc_post);
+
+			if ( (fg_check_status != 0) && ((data_log_level == 2) || (data_log_level == 3)) )
+			{
+				if (fg_check_status == 1)
+				{
+					if(fgr == -1)
+					{
+						f_rname = 1;
+						fgr = get_car_tune_value();
+						if(data_log_level == 3)
+						{
+							fgr_get(fgr);
+							if( (g_platform_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT) ||
+								(g_platform_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT) )
+							{
+								echo_rtc_info(fgr);
+								cat_rtc_value=cat_rtc_info();
+							}
+						}
+					}
+				}
+				else if (fg_check_status == 2)
+				{
+					if(fgr == -1)
+					{
+						f_rname = 2;
+						fgr = calc_fgr();
+						if(data_log_level == 3)
+						{
+							fgr_get(fgr);
+							if( (g_platform_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT) ||
+								(g_platform_boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT) )
+							{
+								echo_rtc_info(fgr);
+								cat_rtc_value=cat_rtc_info();
+							}
+						}
+					}
+				}
+				battery_log(BAT_LOG_FULL, "LE(K)=> APTB: fgr=%d, zfg_w_avg_delta=%d, cat_rtc_value=%d\n", fgr, fg_w_avg_delta, cat_rtc_value);
+			}
+		}
+	}
+}
+//CEI comment end//
 
 void mt_battery_charging_algorithm(void)
 {
@@ -1989,5 +2272,7 @@ void mt_battery_charging_algorithm(void)
 		break;
 	}
 
-	battery_charging_control(CHARGING_CMD_DUMP_REGISTER, NULL);
+//CEI comment start//
+	dump_chg_data();
+//CEI comment end//
 }

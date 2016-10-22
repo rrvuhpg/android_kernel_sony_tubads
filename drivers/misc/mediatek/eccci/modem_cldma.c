@@ -63,7 +63,7 @@ static int md_cd_ccif_send(struct ccci_modem *md, int channel_id);
  * we use this as rgpd->data_allow_len, so skb length must be >= this size, check ccci_bm.c's skb pool design.
  * channel 3 is for network in normal mode, but for mdlogger_ctrl in exception mode, so choose the max packet size.
  */
-static int net_rx_queue_buffer_size[CLDMA_RXQ_NUM] = { 0, 0, 0, SKB_1_5K, SKB_1_5K, SKB_1_5K, 0, 0 };
+static int net_rx_queue_buffer_size[CLDMA_RXQ_NUM] = { 0, 0, 0, NET_RX_BUF, NET_RX_BUF, NET_RX_BUF, 0, 0 };
 static int normal_rx_queue_buffer_size[CLDMA_RXQ_NUM] = { SKB_4K, SKB_4K, SKB_4K, SKB_4K, 0, 0, SKB_4K, SKB_16 };
 
 #if 0				/* for debug log dump convenience */
@@ -3015,7 +3015,13 @@ static void config_ap_runtime_data(struct ccci_modem *md, struct ap_query_md_fea
 	ap_feature->md_runtime_data_addr = ap_feature->ap_runtime_data_addr + CCCI_SMEM_SIZE_RUNTIME_AP;
 	ap_feature->md_runtime_data_size = CCCI_SMEM_SIZE_RUNTIME_MD;
 	ap_feature->set_md_mpu_start_addr = md->mem_layout.smem_region_phy - md->mem_layout.smem_offset_AP_to_MD;
-	ap_feature->set_md_mpu_total_size = md->mem_layout.smem_region_size;
+	ap_feature->set_md_mpu_total_size = md->mem_layout.smem_region_size + md->mem_layout.md1_md3_smem_size;
+	/* Set Flag for modem on feature_set[1].version, specially: [1].support_mask = 0 */
+	ap_feature->feature_set[1].support_mask = 0;
+	/* ver.1: set_md_mpu_total_size = ap md1 share + md1&md3 share */
+	/* ver.0: set_md_mpu_total_size = ap md1 share */
+	ap_feature->feature_set[1].version = 1;
+
 	ap_feature->tail_pattern = AP_FEATURE_QUERY_PATTERN;
 }
 

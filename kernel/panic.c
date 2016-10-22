@@ -24,13 +24,13 @@
 #include <linux/init.h>
 #include <linux/nmi.h>
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/mm.h>
 #include <linux/irq.h>
 #include <linux/cciklog.h>
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -107,24 +107,24 @@ void panic(const char *fmt, ...)
 	if (!spin_trylock(&panic_lock))
 		panic_smp_self_stop();
 
-//[VY36] ==> CCI KLog, modified by Jimmy@CCI
+
 #ifndef CONFIG_CCI_KLOG
 	console_verbose();
 #endif // #ifndef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, modified by Jimmy@CCI
+
 	bust_spinlocks(1);
 	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	set_fault_state(FAULT_LEVEL_PANIC, FAULT_TYPE_NONE, buf);
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	pr_emerg("Kernel panic - not syncing: %s\n", buf);
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 	cklc_save_magic(KLOG_MAGIC_AARM_PANIC, KLOG_STATE_AARM_PANIC);
 	local_irq_disable();
@@ -155,7 +155,7 @@ void panic(const char *fmt, ...)
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
@@ -224,11 +224,11 @@ void panic(const char *fmt, ...)
 		 * shutting down.  But if there is a chance of
 		 * rebooting the system it will be rebooted.
 		 */
-//[VY36] ==> CCI KLog, modified by Jimmy@CCI
+
 #ifndef CONFIG_CCI_KLOG
 		emergency_restart();
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, modified by Jimmy@CCI
+
 	}
 #ifdef __sparc__
 	{
@@ -246,7 +246,7 @@ void panic(const char *fmt, ...)
 		disabled_wait(caller);
 	}
 #endif
-//[VY36] ==> CCI KLog, modified by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 
         emergency_restart();
@@ -255,7 +255,7 @@ void panic(const char *fmt, ...)
 	pr_emerg("---[ end Kernel panic - not syncing: %s\n", buf);
 	local_irq_enable();
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, modified by Jimmy@CCI
+
 	for (i = 0; ; i += PANIC_TIMER_STEP) {
 		touch_softlockup_watchdog();
 		if (i >= i_next) {
@@ -461,18 +461,18 @@ late_initcall(init_oops_id);
 
 void print_oops_end_marker(void)
 {
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	int fault_state = get_fault_state();
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	init_oops_id();
 
 	if (mach_panic_string)
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	{
@@ -484,10 +484,10 @@ void print_oops_end_marker(void)
 		{
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 		printk(KERN_WARNING "Board Information: %s\n",
 		       mach_panic_string);
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 		}
@@ -500,7 +500,7 @@ void print_oops_end_marker(void)
 	else
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	pr_warn("---[ end trace %016llx ]---\n", (unsigned long long)oops_id);
 }
 

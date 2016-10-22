@@ -46,7 +46,10 @@ enum {
 #define KD_PEAK_FLASHLIGHT_ID       2
 #define KD_TORCH_FLASHLIGHT_ID      3
 #define KD_CONSTANT_FLASHLIGHT_ID   4
+//CEI comments start
+
 #define FLASHLIGHT_TIMING_FIX
+//CEI comments end
 typedef enum {
 	e_CAMERA_NONE_SENSOR = 0,
 	e_CAMERA_MAIN_SENSOR = 1,

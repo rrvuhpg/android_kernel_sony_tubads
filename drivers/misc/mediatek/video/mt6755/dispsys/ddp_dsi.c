@@ -2534,7 +2534,7 @@ int DSI_Send_ROI(DISP_MODULE_ENUM module, void *handle, unsigned int x, unsigned
 }
 
 
-//[VY36][LCM] Mark modify for GPIO pin-ctrl function S
+
 #ifdef ORG_VER
 static void lcm_set_reset_pin(uint32_t value)
 {
@@ -2560,7 +2560,7 @@ static void lcm_set_reset_pin(uint32_t value)
 #endif
 }
 #endif
-//[VY36][LCM] Mark modify for GPIO pin-ctrl function E
+
 
 static void lcm_udelay(uint32_t us)
 {
@@ -2664,7 +2664,7 @@ unsigned int DSI_dcs_read_lcm_reg_v2_wrapper_DSIDUAL(uint8_t cmd, uint8_t *buffe
 {
 	return DSI_dcs_read_lcm_reg_v2(DISP_MODULE_DSIDUAL, NULL, cmd, buffer, buffer_size);
 }
-//[VY36][LCM] Mark modify for GPIO pin-ctrl function S
+
 #ifdef ORG_VER
 long lcd_enp_bias_setting(unsigned int value)
 {
@@ -2715,7 +2715,7 @@ long lcm_set_backlight_en(unsigned int value)
 	return ret;
 }
 #endif
-//[VY36][LCM] Mark modify for GPIO pin-ctrl function E
+
 
 int ddp_dsi_set_lcm_utils(DISP_MODULE_ENUM module, LCM_DRIVER *lcm_drv)
 {

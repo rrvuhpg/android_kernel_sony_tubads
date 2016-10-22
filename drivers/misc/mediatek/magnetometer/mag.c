@@ -1114,7 +1114,7 @@ int mag_register_control_path(struct mag_control_path *ctl)
 }
 static int x1, y1, z1;
 static long pc;
-static long count;
+//static long count;
 
 static int check_repeat_data(int x, int y, int z)
 {
@@ -1134,6 +1134,7 @@ static int check_repeat_data(int x, int y, int z)
 }
 
 //static int check_abnormal_data(int x, int y, int z, int status)
+#if 0
 static int check_abnormal_data(long x, long y, long z, int status)
 {
 	long total;
@@ -1154,6 +1155,7 @@ static int check_abnormal_data(long x, long y, long z, int status)
 
 	return 0;
 }
+#endif
 
 int mag_data_report(enum MAG_TYPE type, int x, int y, int z, int status, int64_t nt)
 {
@@ -1161,8 +1163,9 @@ int mag_data_report(enum MAG_TYPE type, int x, int y, int z, int status, int64_t
 	struct mag_context *cxt = NULL;
 
 	check_repeat_data(x, y, z);
+#if 0   //only for debug
 	check_abnormal_data(x, y, z, status);
-
+#endif
 	cxt = mag_context_obj;
 	if (MAGNETIC == type) {
 		input_report_abs(cxt->idev, EVENT_TYPE_MAGEL_STATUS, status);

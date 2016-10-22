@@ -272,8 +272,8 @@ static uint8_t *file_fw_data = file_fw_data_old;
 #define I2C_RETRIES                     5
 #define ELAN_FW_VERSION_DP1       0x5506
 #define ELAN_FW_VER_CPT_PMMA       0x5545
-#define ELAN_FW_VER_CPT_GLASS       0x5590
-#define ELAN_FW_VER_INX_NONAF_KD       0x55F4
+#define ELAN_FW_VER_CPT_GLASS       0x5592
+#define ELAN_FW_VER_INX_NONAF_KD       0x55F5
 #define ELAN_FW_VER_INX_GLASS       0x55C8
 #define ELAN_FW_VER_INX_AF_KD       0x55D1
 
@@ -402,7 +402,7 @@ static uint8_t file_fw_data_CPT_PMMA[] = {
 
 //GLASS
 static uint8_t file_fw_data_CPT_GLASS[] = {
-  #include "VY36_Glass_FW5590_ID00BE_20160518.i" /* modify */
+  #include "VY36_Glass_FW5592_ID00BE_20160817.i" /* modify */
 };
 //add DP2 FW, end
 
@@ -423,7 +423,7 @@ static uint8_t file_fw_data_INX_AF_KD[] = {
 //add 2nd source TP FW, start
 //GLASS + nonAF + KD
 static uint8_t file_fw_data_INX_nonAF_KD[] = {
-  #include "VY36_INX_3260_55F4_00BF_20160518.i" /* modify */
+  #include "VY36_INX_3260_55F5_00BF_20160829.i" /* modify */
 };
 //add 2nd source TP FW, end
 
@@ -2944,8 +2944,8 @@ struct device_attribute *attr, char *buf)
   //get FW info
 // ELAN_FW_VERSION_DP1       0x5506
 // ELAN_FW_VER_CPT_PMMA       0x5545
-// ELAN_FW_VER_CPT_GLASS       0x5590
-// ELAN_FW_VER_INX_NONAF_KD       0x55F4
+// ELAN_FW_VER_CPT_GLASS       0x5592
+// ELAN_FW_VER_INX_NONAF_KD       0x55F5
 // ELAN_FW_VER_INX_GLASS       0x55C8
 // ELAN_FW_VER_INX_AF_KD       0x55D1
 

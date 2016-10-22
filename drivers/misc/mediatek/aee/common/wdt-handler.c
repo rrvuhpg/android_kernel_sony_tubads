@@ -25,11 +25,11 @@
 #endif
 #include "aee-common.h"
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/cciklog.h>
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 #undef WDT_DEBUG_VERBOSE
 /* #define WDT_DEBUG_VERBOSE */
@@ -465,14 +465,14 @@ void aee_wdt_fiq_info(void *arg, void *regs, void *svc_sp)
 	struct pt_regs *ptregs = (struct pt_regs *)regs;
 	int cpu = 0;
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #if CCI_KLOG_CRASH_SIZE
 	set_fault_state(FAULT_LEVEL_WATCHDOG, FAULT_TYPE_NONE, "watchdog");
 #endif // #if CCI_KLOG_CRASH_SIZE
 	cklc_save_magic(KLOG_MAGIC_FIQ_HANG, KLOG_STATE_NONE);
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	asm volatile ("mov %0, %1\n\t" "mov fp, %2\n\t":"=r" (sp) : "r"(svc_sp), "r"(ptregs->ARM_fp));
 

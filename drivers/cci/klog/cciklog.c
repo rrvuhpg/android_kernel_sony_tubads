@@ -1829,7 +1829,7 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	struct logger_entry header;
 	struct timespec now;
 	ssize_t ret = 0;
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 	unsigned int category = KLOG_IGNORE;
 	unsigned int priority = 0;
@@ -1841,7 +1841,7 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	int idx = 0;
 	char klog_type[20];
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 		// android default timestamp
 		//now = current_kernel_time();
@@ -1923,11 +1923,11 @@ else
 		/* figure out how much of this vector we can keep */
 		len = min_t(size_t, iov->iov_len, header.len - ret);
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 		log_offset = log->w_off;
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 		/* write out this segment's payload */
 		nr = do_write_log_from_user(log, iov->iov_base, len);
@@ -1936,7 +1936,7 @@ else
 			mutex_unlock(&log->mutex);
 			return nr;
 		}
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 		switch(idx)
 		{
@@ -1954,12 +1954,12 @@ else
 		}
 		idx++;
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 		iov++;
 		ret += nr;
 	}
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 	if(idx == 4)
 	{
@@ -1970,7 +1970,7 @@ else
 		}
 	}
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	mutex_unlock(&log->mutex);
 

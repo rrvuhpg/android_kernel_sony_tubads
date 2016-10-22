@@ -55,11 +55,11 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/printk.h>
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/cciklog.h>
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 #include "console_cmdline.h"
 #include "braille.h"
@@ -402,11 +402,11 @@ static u32 log_next(u32 idx)
 	return idx + msg->len;
 }
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
 #define PRINTK_CPU_INFO
 #endif // #ifdef CCI_KLOG_ALLOW_FORCE_PANIC
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 /*
  * Check whether there is enough free space for the given message.
@@ -498,7 +498,7 @@ static int log_store(int facility, int level,
 	struct printk_log *msg;
 	u32 size, pad_len;
 	u16 trunc_msg_len = 0;
-//[VY36] ==> CCI KLog, modified by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 	char buf[5] = {0};
 #endif // #ifdef CONFIG_CCI_KLOG
@@ -524,7 +524,7 @@ static int log_store(int facility, int level,
 #else // #ifdef PRINTK_CPU_INFO
 	size = msg_used_size(text_len , dict_len, &pad_len);
 #endif // #ifdef PRINTK_CPU_INFO
-//[VY36] <== CCI KLog, modified by Jimmy@CCI
+
 
 	if (log_make_free_space(size)) {
 		/* truncate the message if it is too long for empty buffer */
@@ -545,7 +545,7 @@ static int log_store(int facility, int level,
 		log_next_idx = 0;
 	}
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 	level &= 7;
 	flags &= 0x1f;
@@ -563,11 +563,11 @@ static int log_store(int facility, int level,
 		cklc_append_newline();
 	}
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	/* fill message */
 	msg = (struct printk_log *)(log_buf + log_next_idx);
-//[VY36] ==> CCI KLog, modified by Jimmy@CCI
+
 #ifdef PRINTK_CPU_INFO
 	memcpy(log_text(msg), tbuf, tlen);
 	if (tlen + text_len > LOG_LINE_MAX)
@@ -578,7 +578,7 @@ static int log_store(int facility, int level,
 #else // #ifdef PRINTK_CPU_INFO
 	memcpy(log_text(msg), text, text_len);
 #endif // #ifdef PRINTK_CPU_INFO
-//[VY36] <== CCI KLog, modified by Jimmy@CCI
+
 	msg->text_len = text_len;
 	if (trunc_msg_len) {
 		memcpy(log_text(msg) + text_len, trunc_msg, trunc_msg_len);
@@ -1991,6 +1991,10 @@ asmlinkage __visible int printk(const char *fmt, ...)
 {
 	va_list args;
 	int r;
+
+#ifdef DISABLE_UART_LOG
+       printk_disable_uart = 1;
+#endif
 
 #ifdef CONFIG_KGDB_KDB
 	if (unlikely(kdb_trap_printk)) {

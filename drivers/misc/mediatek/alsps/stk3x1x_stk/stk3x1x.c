@@ -158,10 +158,10 @@ int FIRST_BOOT_L_THD = 0;
 	unsigned int cci_ps_low_thd=0;
 	//STK add for CCI end 20130112
 
-	/*VY36 use ony start*/
+	/**/
 	int offset_H=0;
 	int offset_L=0;
-	/*VY36 use ony end*/
+	/**/
 #endif /* #ifdef STK_TUNE0 */
 
 #define STK_IRC_MAX_ALS_CODE		20000
@@ -1942,7 +1942,7 @@ static int stk_ps_tune_zero_func_fae(struct stk3x1x_priv *obj)
 		{
 			//printk(KERN_INFO "%s:============START CHECK IF CT IS TOO BIG============\n", __func__);
 			printk(KERN_INFO "%s:cci_ps_cover(%d) and 2*CT(%d)\n", __func__, cci_ps_cover, 2*cci_result_ct);
-			//MAX_CT = MAX_COMPARE(cci_ps_cover, 2*cci_result_ct); Nina removed for VY36, cause grease and protector on CT is less than LT
+			
 			//printk(KERN_INFO "%s:MAX_CT = %d\n",  __func__, MAX_CT);
 
 			printk(KERN_INFO "%s:MIN Compare psi_set(%d) and cci_ps_high_thd(%d)\n", __func__, obj->psi_set, cci_ps_high_thd);
@@ -2816,7 +2816,7 @@ static ssize_t stk3x1x_store_cali(struct device_driver *ddri, const char *buf,si
 		cci_result_ct_x2 = 15000;
 
 
-/*-----------VY36 use only, can't for other project START----*/
+/**/
 	if(AP_build_hwid==board_type_with_hw_id() || TP_build_hwid==board_type_with_hw_id() ){ 
 
 		if((cci_ps_high_thd-cci_ps_low_thd)<150){
@@ -2838,7 +2838,7 @@ static ssize_t stk3x1x_store_cali(struct device_driver *ddri, const char *buf,si
 		offset_H=0;
 		offset_L=0;
 	}
-/*-----------VY36 use only, can't for other project END----*/	
+/**/	
 	printk(KERN_INFO "%s: original  HT=%d, oriinal  LT=%d, CT=%d, offset_H=%d, offset_L=%d\n", __func__, (cci_result_ct_x2 + (cci_ps_high_thd - cci_result_ct)),   (cci_result_ct_x2 + (cci_ps_low_thd - cci_result_ct)),cci_result_ct ,offset_H,offset_L);				
 	
 	atomic_set(&stk3x1x_obj->ps_high_thd_val, cci_result_ct_x2 +(cci_ps_high_thd - cci_result_ct)-offset_H);

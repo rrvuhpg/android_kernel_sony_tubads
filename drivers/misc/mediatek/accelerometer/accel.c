@@ -790,6 +790,7 @@ static int acc_input_init(struct acc_context *cxt)
 	input_set_capability(dev, EV_REL, EVENT_TYPE_ACCEL_UPDATE);
 	input_set_capability(dev, EV_REL, EVENT_TYPE_ACCEL_TIMESTAMP_HI);
 	input_set_capability(dev, EV_REL, EVENT_TYPE_ACCEL_TIMESTAMP_LO);
+	input_set_capability(dev, EV_REL, REL_MISC);
 
 	input_set_abs_params(dev, EVENT_TYPE_ACCEL_X, ACC_VALUE_MIN, ACC_VALUE_MAX, 0, 0);
 	input_set_abs_params(dev, EVENT_TYPE_ACCEL_Y, ACC_VALUE_MIN, ACC_VALUE_MAX, 0, 0);

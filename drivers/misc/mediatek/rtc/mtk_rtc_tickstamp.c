@@ -16,6 +16,7 @@
 #include <mtk_rtc_tickstamp.h>
 
 #define INFINITY ((unsigned int)-1)
+
 #define VOID_EXIT_IF(x) do { if (x) goto _exit; } while(0);
 #define VOID_RETURN_IF(x) do { if (x) return; } while(0);
 
@@ -23,7 +24,8 @@
 #define TS_PATH TS_DIR"/tickstamp"
 
 static DEFINE_MUTEX(ts_stamp_rw_mutex);
-static struct tick_stamp g_stamp;
+static DEFINE_SPINLOCK(stamp_lock);
+static struct tick_stamp g_stamp = { .epoch = MAX_STAMP };
 static struct ts_work_struct ts_write_work;
 static struct ts_work_struct ts_read_work;
 static ticker_func g_ticker_fn;
@@ -122,8 +124,12 @@ static ssize_t ts_write(struct file *fp, char *data, size_t count) {
 }
 
 static inline void get_stamp(struct tick_stamp *stamp) {
+	unsigned long flags;
+
 	VOID_RETURN_IF(!stamp);
+	spin_lock_irqsave(&stamp_lock, flags);
 	*stamp = g_stamp;
+	spin_unlock_irqrestore(&stamp_lock, flags);
 }
 
 static void ts_read_stamp(struct work_struct *work) {
@@ -131,6 +137,8 @@ static void ts_read_stamp(struct work_struct *work) {
 	struct file *tsfp = NULL;
 	struct ts_work_struct *ts_read_work;
 	unsigned long tick = 0;
+	unsigned long flags;
+	struct tick_stamp stamp;
 
 	ts_read_work = container_of(work, struct ts_work_struct, work);
 	VOID_EXIT_IF(!wait_vfsmount(TS_DIR, ts_read_work->trigger_interval,
@@ -140,8 +148,12 @@ static void ts_read_stamp(struct work_struct *work) {
 	tsfp = ts_open(TS_PATH, O_RDONLY, 0);
 	VOID_EXIT_IF(!tsfp);
 
-	size = ts_read(tsfp, (char *)&g_stamp, sizeof(g_stamp));
+	size = ts_read(tsfp, (char *)&stamp, sizeof(g_stamp));
 	VOID_EXIT_IF(size < 0);
+
+	spin_lock_irqsave(&stamp_lock, flags);
+	g_stamp = stamp;
+	spin_unlock_irqrestore(&stamp_lock, flags);
 
 	if (likely(NULL != g_ticker_fn)) {
 		tick = g_ticker_fn();
@@ -150,10 +162,12 @@ static void ts_read_stamp(struct work_struct *work) {
 		 * (eg. power loss) after the current RTC value.
 		 * This will trigger increase of secure clock ticker version
 		 */
-		if (g_stamp.epoch > (long)tick) {
+		spin_lock_irqsave(&stamp_lock, flags);
+		if (g_stamp.epoch > tick) {
 			g_stamp.epoch = 0;
 			size = -EINVAL;
 		}
+		spin_unlock_irqrestore(&stamp_lock, flags);
 	}
 
 _exit:
@@ -227,10 +241,17 @@ bool ts_init(ticker_func ticker_fn) {
 
 void ts_stamp(const unsigned long tick) {
 	long delta;
+	unsigned long flags;
 
 	VOID_RETURN_IF(unlikely(NULL == g_ticker_fn));
 	delta = (long)(g_ticker_fn() - tick);
+
+	spin_lock_irqsave(&stamp_lock, flags);
+	if (MAX_STAMP == g_stamp.epoch) {
+		g_stamp.epoch = 0;
+	}
 	g_stamp.epoch += delta;
+	spin_unlock_irqrestore(&stamp_lock, flags);
 }
 
 
@@ -238,14 +259,7 @@ bool ts_set(void) {
 	return ts_work_run(&ts_write_work) == 0;
 }
 
-/*
- * Reads the current stamp without locking so it can be called
- * in any context, and return in short time. Therefore, might
- * return invalid epoch value. Not called very often and from
- * single-threaded environment, so we can sacrifice accuracy
- * to achieve lower complexity
-*/
-void ts_get(long *epoch) {
+void ts_get(unsigned long *epoch) {
 	struct tick_stamp stamp;
 
 	VOID_RETURN_IF(unlikely(NULL == epoch));

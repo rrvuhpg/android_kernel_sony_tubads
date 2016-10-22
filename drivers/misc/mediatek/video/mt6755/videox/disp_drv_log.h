@@ -11,15 +11,11 @@
 #define DISPMSG(string, args...) pr_debug("[DISP]"string, ##args)
 #define DISPCHECK(string, args...) pr_debug("[DISPCHECK]"string, ##args)
 
-#ifdef ENABLE_DISPDBG_LOG_CCI
-	#define DISPDBG(string, args...) pr_debug("disp/"string, ##args)
-#else
 #define DISPDBG(string, args...)                   \
 	do {                                       \
 		if (ddp_debug_dbg_log_level())          \
 			pr_debug("disp/"string, ##args);            \
 	} while (0)
-#endif
 
 #define DISPPR_FENCE(string, args...)                    \
 	do { \

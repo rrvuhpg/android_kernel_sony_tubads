@@ -136,9 +136,9 @@ static const UINT_16 g_u2CountryGroup0[] = {
 };
 
 static const UINT_16 g_u2CountryGroup1[] = {
-	COUNTRY_CODE_AS, COUNTRY_CODE_AI, COUNTRY_CODE_BM, COUNTRY_CODE_CA,
-	COUNTRY_CODE_KY, COUNTRY_CODE_GU, COUNTRY_CODE_FM, COUNTRY_CODE_PR,
-	COUNTRY_CODE_US, COUNTRY_CODE_VI
+       COUNTRY_CODE_AS, COUNTRY_CODE_AI, COUNTRY_CODE_BM, COUNTRY_CODE_KY,
+       COUNTRY_CODE_GU, COUNTRY_CODE_FM, COUNTRY_CODE_PR, COUNTRY_CODE_US,
+       COUNTRY_CODE_VI
 };
 
 static const UINT_16 g_u2CountryGroup2[] = {
@@ -241,14 +241,16 @@ static const UINT_16     g_u2CountryGroup20[] =
 	COUNTRY_CODE_RU, COUNTRY_CODE_BY, COUNTRY_CODE_KZ, COUNTRY_CODE_UA
 };
 
-static const UINT_16 g_u2CountryGroup21[] = {
+static const UINT_16 g_u2CountryGroup21[] = { COUNTRY_CODE_CA };
+
+static const UINT_16 g_u2CountryGroup22[] = {
 	COUNTRY_CODE_DF, COUNTRY_CODE_FF
 	/* When country code is not found and no matched NVRAM setting,
 	 * this domain info will be used.
 	 */
 };
 
-static const UINT_16 g_u2CountryGroup22[] = {
+static const UINT_16 g_u2CountryGroup23[] = {
 	COUNTRY_CODE_UDF
 };
 
@@ -627,8 +629,27 @@ DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 	}
 	,
 	{
-	 /* Note: REG_DOMAIN_DEF_IDX group is Europe union */
 	 (PUINT_16) g_u2CountryGroup21, sizeof(g_u2CountryGroup21) / 2,
+	 {
+         {81, BAND_2G4, CHNL_SPAN_5, 1, 11, FALSE}
+         ,                     /* CH_SET_2G4_1_11 */
+
+         {115, BAND_5G, CHNL_SPAN_20, 36, 4, FALSE}
+         ,                     /* CH_SET_UNII_LOW_36_48 */
+         {118, BAND_5G, CHNL_SPAN_20, 52, 4, TRUE}
+         ,                     /* CH_SET_UNII_MID_52_64 */
+         {121, BAND_5G, CHNL_SPAN_20, 100, 5, TRUE}
+         ,                     /* CH_SET_UNII_WW_100_116 */
+         {121, BAND_5G, CHNL_SPAN_20, 132, 4, TRUE}
+         ,                     /* CH_SET_UNII_WW_132_144 */
+         {125, BAND_5G, CHNL_SPAN_20, 149, 5, FALSE}
+                               /* CH_SET_UNII_UPPER_149_165 */
+	 }
+	}
+	,
+	{
+	 /* Note: REG_DOMAIN_DEF_IDX group is Europe union */
+	 (PUINT_16) g_u2CountryGroup22, sizeof(g_u2CountryGroup22) / 2,
 	 {
 	  {81, BAND_2G4, CHNL_SPAN_5, 1, 13, FALSE}
 	  ,			/* CH_SET_2G4_1_13 */
@@ -647,7 +668,7 @@ DOMAIN_INFO_ENTRY arSupportedRegDomains[] = {
 	,
 	{
 	 /* Note: for customer configured their own scanning list and passive scan list */
-	 (PUINT_16) g_u2CountryGroup22, sizeof(g_u2CountryGroup22) / 2,
+	 (PUINT_16) g_u2CountryGroup23, sizeof(g_u2CountryGroup23) / 2,
 	 {
 	  {81, BAND_2G4, CHNL_SPAN_5, 1, 12, FALSE}
 	  ,			/* CH_SET_2G4_1_13 */
@@ -745,7 +766,7 @@ SUBBAND_CHANNEL_T g_rRlmSubBand[] = {
 /*----------------------------------------------------------------------------*/
 P_DOMAIN_INFO_ENTRY rlmDomainGetDomainInfo(P_ADAPTER_T prAdapter)
 {
-#define REG_DOMAIN_DEF_IDX             21 /* Default country domain */
+#define REG_DOMAIN_DEF_IDX             22 /* Default country domain */
 #define REG_DOMAIN_GROUP_NUM  \
 	(sizeof(arSupportedRegDomains) / sizeof(DOMAIN_INFO_ENTRY))
 

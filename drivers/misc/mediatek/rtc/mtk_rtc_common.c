@@ -225,6 +225,53 @@ int set_rtc_spare_fg_value(int val)
 	return 0;
 }
 
+//CEI comment start//
+extern int get_car_tune_value(void);
+
+int cat_rtc_info(void)
+{
+	int value;
+	int tmp_val;
+	int default_car;
+	unsigned long flags;
+
+	spin_lock_irqsave(&rtc_lock, flags);
+	tmp_val = rtc_read(0x401e);
+	value = (tmp_val >> 0x8) & 0xff;
+	spin_unlock_irqrestore(&rtc_lock, flags);
+
+	default_car = get_car_tune_value();
+	if( (value == 101) ||(value == 104) || (value == 107) ||(value == default_car) )
+		tmp_val = value;
+	else
+		tmp_val = 0;
+
+	if( (value < 98) || (value > 119) )
+		tmp_val = 0;
+
+	return tmp_val;
+}
+
+int echo_rtc_info(int val)
+{
+	int tmp_val;
+	unsigned long flags;
+	int default_car;
+
+	default_car = get_car_tune_value();
+	if( (val != 101) && (val != 104) && (val != 107) && (val != default_car) && (val != 0)) // 0 for clear
+		return 0;
+
+	spin_lock_irqsave(&rtc_lock, flags);
+	tmp_val = rtc_read(0x401e) & ~(0xff <<0x8);
+	rtc_write(0x401e, tmp_val | ((val & 0xff) <<0x8));
+	rtc_write_trigger();
+	spin_unlock_irqrestore(&rtc_lock, flags);
+
+	return 1;
+}
+//CEI comment end//
+
 bool crystal_exist_status(void)
 {
 	unsigned long flags;
@@ -740,11 +787,18 @@ static ssize_t rtc_show_monotonic(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
 	unsigned long tick;
-	long epoch;
+	unsigned long epoch;
 
 	tick = rtc_get_monotonic_tick();
 	ts_get(&epoch);
-	epoch = (long)tick - epoch;
+	if (MAX_STAMP == epoch) {
+		/*
+		  Tick still not stamped.
+		  Ask the caller to try again later
+		*/
+		return -EAGAIN;
+	}
+	epoch = tick - epoch;
 
 	return sprintf(buf, "%lu\n", epoch);
 }

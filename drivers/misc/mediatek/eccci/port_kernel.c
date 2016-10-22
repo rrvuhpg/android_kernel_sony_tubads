@@ -132,10 +132,10 @@ static inline void append_runtime_feature(char **p_rt_data, struct ccci_runtime_
 {
 	CCCI_DBG_MSG(-1, KERN, "append rt_data %p, feature %u len %u\n",
 		     *p_rt_data, rt_feature->feature_id, rt_feature->data_len);
-	memcpy(*p_rt_data, rt_feature, sizeof(struct ccci_runtime_feature));
+	memcpy_toio(*p_rt_data, rt_feature, sizeof(struct ccci_runtime_feature));
 	*p_rt_data += sizeof(struct ccci_runtime_feature);
 	if (data != NULL) {
-		memcpy(*p_rt_data, data, rt_feature->data_len);
+		memcpy_toio(*p_rt_data, data, rt_feature->data_len);
 		*p_rt_data += rt_feature->data_len;
 	}
 }
@@ -215,6 +215,7 @@ static void config_ap_side_feature(struct ccci_modem *md, struct md_query_ap_fea
 #endif
 	ap_side_md_feature->feature_set[MD_IMAGE_START_MEMORY].support_mask = CCCI_FEATURE_OPTIONAL_SUPPORT;
 
+	ap_side_md_feature->feature_set[CCMNI_MTU].support_mask = CCCI_FEATURE_MUST_SUPPORT;
 }
 
 static int prepare_runtime_data(struct ccci_modem *md, struct ccci_request *req)
@@ -411,6 +412,11 @@ static int prepare_runtime_data(struct ccci_modem *md, struct ccci_request *req)
 				rt_shm.addr = md->img_info[IMG_MD].address;
 				rt_shm.size = md->img_info[IMG_MD].size;
 				append_runtime_feature(&rt_data, &rt_feature, &rt_shm);
+				break;
+			case CCMNI_MTU:
+				rt_feature.data_len = sizeof(unsigned int);
+				random_seed = NET_RX_BUF - sizeof(struct ccci_header);
+				append_runtime_feature(&rt_data, &rt_feature, &random_seed);
 				break;
 			default:
 				break;

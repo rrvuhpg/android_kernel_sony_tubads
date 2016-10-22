@@ -1,6 +1,3 @@
-ifeq ($(strip $(TARGET_BUILD_VARIANT)),userdebug)
-ccflags-y += -DDISABLE_UART_LOG
-endif
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 ccflags-y += -Idrivers/misc/mediatek/aee/aed/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)

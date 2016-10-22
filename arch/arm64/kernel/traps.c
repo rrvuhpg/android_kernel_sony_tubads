@@ -38,11 +38,11 @@
 #include <asm/exception.h>
 #include <asm/system_misc.h>
 #include <mt-plat/mt_hooks.h>
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/cciklog.h>
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 static const char *handler[]= {
 	"Synchronous Abort",
@@ -232,13 +232,13 @@ void die(const char *str, struct pt_regs *regs, int err)
 
 	oops_enter();
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	set_fault_state(FAULT_LEVEL_DIE, err, str);
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	raw_spin_lock_irq(&die_lock);
 	console_verbose();

@@ -1,3 +1,6 @@
+ifeq ($(strip $(TARGET_BUILD_VARIANT)),user)
+ccflags-y += -DDISABLE_UART_LOG
+endif
 #ccflags-y += -DCONFIG_MTK_FPGA
 #ccflags-y += -DFIX_TO_26M
 

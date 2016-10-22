@@ -250,14 +250,14 @@ void __show_regs(struct pt_regs *regs)
 		top_reg = 29;
 	}
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 	show_regs_print_info(KERN_ALERT);
 #else // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 	show_regs_print_info(KERN_DEFAULT);
 #endif // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
-//[VY36] <== CCI KLog, added by Jimmy@CCI
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
+
 #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 	print_symbol(KERN_ALERT "PC is at %s\n", instruction_pointer(regs));
 	print_symbol(KERN_ALERT "LR is at %s\n", lr);
@@ -267,31 +267,31 @@ void __show_regs(struct pt_regs *regs)
 	print_symbol("LR is at %s\n", lr);
 	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
 #endif // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	       regs->pc, lr, regs->pstate);
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 	printk(KERN_ALERT "sp : %016llx\n", sp);
 #else // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 	printk("sp : %016llx\n", sp);
 #endif // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	for (i = top_reg; i >= 0; i--) {
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 		printk(KERN_ALERT "x%-2d: %016llx ", i, regs->regs[i]);
 #else // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 		printk("x%-2d: %016llx ", i, regs->regs[i]);
 #endif // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 		if (i % 2 == 0)
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 			printk(KERN_ALERT "\n");
 #else // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
 			printk("\n");
 #endif // #if defined(CCI_KLOG_CRASH_SIZE) && CCI_KLOG_CRASH_SIZE > 0
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	}
 	if (!user_mode(regs))
 		show_extra_register_data(regs, 128);

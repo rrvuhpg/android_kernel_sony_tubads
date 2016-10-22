@@ -62,9 +62,3 @@ ccflags-y += -DHWGPU_SUPPORT
 endif
 
 #ccflags-y += -DDEBUG
-
-#[Mark] Enable display debug log in userdebug build by MTK suggestion - S
-ifeq ($(TARGET_BUILD_VARIANT),userdebug)
-ccflags-y += -DENABLE_DISPDBG_LOG_CCI
-endif
-#[Mark] Enable display debug log in userdebug build by MTK suggestion - E

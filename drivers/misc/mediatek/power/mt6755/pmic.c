@@ -92,12 +92,18 @@
 #include <mach/mt_pmic.h>
 #include <mt-plat/mt_reboot.h>
 #include <mach/mt_charging.h>
+//CEI comments start
+
+//CEI comments start
+
 //#include <mt-plat/mt_gpio.h>
 //#include <mt-plat/mt_gpio_core.h>
 //#include <mach/gpio_const.h>
 //extern int get_led_control_state(void);
 //extern int get_gpio_init_state(void);
 //extern struct mutex led_control_mutex;
+//CEI comments end
+//CEI comments end
 /*****************************************************************************
  * PMIC extern variable
  ******************************************************************************/
@@ -142,6 +148,33 @@ static int pmic_regulator_ldo_init(struct platform_device *pdev);
 static DEFINE_MUTEX(pmic_access_mutex);
 /*--- Global suspend state ---*/
 static bool pmic_suspend_state;
+
+int pmic_force_vcore_pwm(bool enable)
+{
+	int val, val1, val2, ret;
+
+	ret = pmic_read_interface_nolock(0x44e, &val, 0xFFFF, 0x0);
+	ret = pmic_read_interface_nolock(0x450, &val1, 0xFFFF, 0x0);
+	ret = pmic_read_interface_nolock(0x452, &val2, 0xFFFF, 0x0);
+	pr_err("[pmic]pre force_vcore_pwm:0x%x, 0x%x, 0x%x\n", val, val1, val2);
+
+	if (enable == true) {
+		ret = pmic_config_interface_nolock(0x450, 0x0, 0x7, 0);
+		ret = pmic_config_interface_nolock(0x452, 0x0, 0x1, 3);
+		ret = pmic_config_interface_nolock(0x44e, 0x1, 0x1, 1);
+	} else {
+		ret = pmic_config_interface_nolock(0x44e, 0x0, 0x1, 1);
+		ret = pmic_config_interface_nolock(0x450, 0x4, 0x7, 0);
+		ret = pmic_config_interface_nolock(0x452, 0x1, 0x1, 3);
+	}
+
+	ret = pmic_read_interface_nolock(0x44e, &val, 0xFFFF, 0x0);
+	ret = pmic_read_interface_nolock(0x450, &val1, 0xFFFF, 0x0);
+	ret = pmic_read_interface_nolock(0x452, &val2, 0xFFFF, 0x0);
+	pr_err("[pmic]post force_vcore_pwm:0x%x, 0x%x, 0x%x\n", val, val1, val2);
+
+	return 0;
+}
 
 void vmd1_pmic_setting_on(void)
 {
@@ -757,6 +790,10 @@ unsigned int upmu_get_rgs_chrdet(void)
 	/*val = mt6325_upmu_get_rgs_chrdet();*/
 	val = pmic_get_register_value(PMIC_RGS_CHRDET);
 	PMICLOG("[upmu_get_rgs_chrdet] CHRDET status = %d\n", val);
+    //CEI comments start
+    
+	//CEI comments start
+    
 	//mutex_lock(&led_control_mutex);
     //if (get_gpio_init_state() == 1 && get_led_control_state() == 0) {
     //    if (val == 1 && mt_get_gpio_out(108) == 1) {
@@ -768,6 +805,8 @@ unsigned int upmu_get_rgs_chrdet(void)
   	//    }
 	//}
     //mutex_unlock(&led_control_mutex);    
+	//CEI comments end
+    //CEI comments end
 	return val;
 }
 
@@ -4400,6 +4439,10 @@ static int fb_early_init_dt_get_chosen(unsigned long node, const char *uname, in
 	return 1;
 }
 #endif /*end of #ifdef DLPT_FEATURE_SUPPORT*/
+
+//CEI comment start//
+extern int get_car_tune_value_rtc(void);
+//CEI comment end/
 static int pmic_mt_probe(struct platform_device *dev)
 {
 	int ret_device_file = 0, i;
@@ -4429,7 +4472,7 @@ static int pmic_mt_probe(struct platform_device *dev)
 		PMICLOG("Get car_tune_value from cust header\n");
 	}
 #else
-	batt_meter_cust_data.car_tune_value = get_car_tune_value();
+	batt_meter_cust_data.car_tune_value = get_car_tune_value_rtc();
 	PMICLOG("LE(K)=> Get car_tune_value from DT: %d\n", batt_meter_cust_data.car_tune_value);
 #endif
 //CEI comment end//

@@ -34,10 +34,14 @@
 #define BUG() *((unsigned *)0xaed) = 0xDEAD
 #endif
 
+/**/
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <linux/switch.h>
+/**/
 #include <linux/workqueue.h>
+/**/
+/**/
 
 void __iomem *kp_base;
 static unsigned int kp_irqnr;
@@ -94,6 +98,7 @@ static DECLARE_TASKLET(kpd_camera_focus_tasklet, camera_focus_eint_func, 0);
 static DECLARE_TASKLET(kpd_camera_capture_tasklet, camera_capture_eint_func, 0);
 //Camera key bring up -E
 
+/**/
 /* for hall sensor setting */
 #define CEI_HALL_OUT 107
 static void hall_out_handler(unsigned long data);
@@ -104,8 +109,11 @@ struct pinctrl *pinctrl_hall;
 struct pinctrl_state *pins_hall_default;
 static unsigned int hall_irqnr;
 struct device_node *hall_irq_node;
+/**/
 static struct delayed_work hall_work;
 static struct mutex hall_state_mutex;
+/**/
+/**/
 
 /*********************************************************************/
 static void kpd_memory_setting(void);
@@ -869,7 +877,7 @@ static int kpd_open(struct input_dev *dev)
 }
 
 /*********************************************************************/
-/* [VY36] S- BUG#4 Grace_Chang hall sensor bring up */
+/**/
 static int hall_out_status_show(struct seq_file *s, void *unused)
 {
 	int state;
@@ -889,6 +897,7 @@ static const struct file_operations hall_out_status_fops = {
 	.release	= single_release,
 };
 
+/**/
 static void hall_work_func(struct work_struct *work)
 {
 	int state;
@@ -912,9 +921,11 @@ static void hall_work_func(struct work_struct *work)
 	}
 	mutex_unlock(&hall_state_mutex);
 }
+/**/
 
 static void hall_out_handler(unsigned long data)
 {
+/**/
 #if 0
 	int state;
 	state = __gpio_get_value(CEI_HALL_OUT);
@@ -937,6 +948,7 @@ static void hall_out_handler(unsigned long data)
 #endif
 	kpd_print("[Keypad] %s() Enter\n", __FUNCTION__);
 	schedule_delayed_work(&hall_work, 0);
+/**/
 	enable_irq(hall_irqnr);
 }
 
@@ -1017,7 +1029,7 @@ hall_gpio_pinctrl_err:
 	kpd_print("[Keypad] %s , exit - Fail\n", __FUNCTION__ );
 	return -EINVAL;
 }
-/* [VY36] E- BUG#4 Grace_Chang hall sensor bring up */
+/**/
 /*********************************************************************/
 
 void kpd_get_dts_info(struct device_node *node)
@@ -1066,8 +1078,8 @@ static int kpd_camerakey_setup_eint(void)
 	struct device_node *node;
 	u32 ints[2] = { 0, 0 };
 	u32 ints1[2] = { 0, 0 };
-	//int irq_flags;
-	//irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING | IRQF_ONESHOT;
+	int cmkey_irq_flags;
+	cmkey_irq_flags = IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH | IRQF_ONESHOT;
 	//Focus key Setting.
 	node = of_find_compatible_node(NULL, NULL, "mediatek,CEI_CAMERA_FOCUS-eint");
 	if (node) {
@@ -1077,10 +1089,10 @@ static int kpd_camerakey_setup_eint(void)
 		camerakeydebounce = ints[1];
 		focuskey_eint_type = ints1[1];
 		//gpio_request(gpiopin, "foucskey");
-		//gpio_set_debounce(gpiopin, 1024);
+		gpio_set_debounce(gpiopin, 300);
 		//gpio_free(gpiopin);
 		focuskey_irq = irq_of_parse_and_map(node, 0);
-		err = request_irq(focuskey_irq, kpd_camera_focus_eint_handler, IRQF_TRIGGER_NONE, "focuskey-eint", NULL);
+		err = request_irq(focuskey_irq, kpd_camera_focus_eint_handler, cmkey_irq_flags, "focuskey-eint", NULL);
 		//err = request_irq(focuskey_irq, kpd_camera_focus_eint_handler, irq_flags, "focuskey-eint", NULL);
 		if (err > 0) {
 			kpd_print("[Keypad] FOUCS KEY EINT IRQ LINE NOT AVAILABLE\n");
@@ -1100,10 +1112,10 @@ static int kpd_camerakey_setup_eint(void)
 		camerakeydebounce = ints[1];
 		capturekey_eint_type = ints1[1];
 		//gpio_request(gpiopin, "capturekey");
-		//gpio_set_debounce(gpiopin, 1024);
+	       gpio_set_debounce(gpiopin, 300);
 		//gpio_free(gpiopin);
 		capturekey_irq = irq_of_parse_and_map(node, 0);
-		err = request_irq(capturekey_irq, kpd_camera_capture_eint_handler, IRQF_TRIGGER_NONE, "capturekey-eint", NULL);
+		err = request_irq(capturekey_irq, kpd_camera_capture_eint_handler, cmkey_irq_flags, "capturekey-eint", NULL);
 		//err = request_irq(capturekey_irq, kpd_camera_capture_eint_handler, irq_flags, "capturekey-eint", NULL);
 		if (err > 0) {
 			kpd_print("[Keypad] CAPTURE KEY EINT IRQ LINE NOT AVAILABLE\n");
@@ -1290,7 +1302,7 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 	pinctrl_select_state(pinctrl1, pins_eint_int);
 //keypad bring up - E
 
-	/* [VY36] S- BUG#4 Grace_Chang hall sensor bring up */
+	/**/
 	err = hall_gpio_eint_setup(pdev);
 	if (err!=0) {
 		kpd_print("[Keypad] %s , hall_gpio_eint_setup failed (%d)\n", __FUNCTION__ , err );
@@ -1306,9 +1318,14 @@ static int kpd_pdrv_probe(struct platform_device *pdev)
 		switch_dev_unregister(&sdev);
 		return r;
 	}
+	/**/
 	switch_set_state((struct switch_dev *)&sdev, 1);	// state initialization
+	/**/
+	/**/
 	mutex_init(&hall_state_mutex);
 	INIT_DELAYED_WORK(&hall_work, hall_work_func);
+	/**/
+	/**/
 
 #if defined(CONFIG_KPD_PWRKEY_USE_EINT) || defined(CONFIG_KPD_PWRKEY_USE_PMIC)
 	__set_bit(kpd_dts_data.kpd_sw_pwrkey, kpd_input_dev->keybit);

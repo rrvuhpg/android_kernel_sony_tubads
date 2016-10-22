@@ -75,18 +75,30 @@ static int g_strobePartId[e_Max_Sensor_Dev_Num][e_Max_Strobe_Num_Per_Dev];
 /* ============================== */
 /* functions */
 /* ============================== */
+//CEI comments start
+
 extern int FL_Enable(void);
 extern int FL_Disable(void);
 extern int FL_dim_duty(kal_uint32 duty);
 extern int FL_preOn(void);
+// CEI comments end
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 extern int FL_Init(void);
 extern int FL_Uninit(void);
 int g_light_test = 0;
 #else
+//CEI comments start
+
 extern void timerInit(void);
+//CEI comments end
 #endif
+//CEI comments end
+//CEI comments tart
+
 extern int g_duty;
+//CEI comments end
 int globalInit(void)
 {
 	int i;
@@ -465,6 +477,8 @@ static long flashlight_ioctl_core(struct file *file, unsigned int cmd, unsigned 
 			logI("FLASH_IOC_GET_PART_ID line=%d partId=%d", __LINE__, partId);
 		}
 		break;
+    //CEI comments tart
+    
     case FLASH_IOC_GET_PRE_ON_TIME_MS_DUTY:
 		{
         	FLASHLIGHT_FUNCTION_STRUCT *pF;
@@ -702,9 +716,14 @@ static struct device *flashlight_device;
 static struct flashlight_data flashlight_private;
 static dev_t flashlight_devno;
 static struct cdev flashlight_cdev;
+//CEI comments start
+
 static unsigned int g_flash = 0, g_torch = 0;
+// CEI comments end
 /* ======================================================================== */
 #define ALLOC_DEVNO
+//CEI comments start
+
 static ssize_t flashlight_flash_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -722,15 +741,24 @@ static ssize_t flashlight_flash_store(struct device *dev,
 	if (ret)
 		return ret;
     printk("%s: val=%lu\n", __func__, val);
+//CEI comments start
+
 	if (g_duty >= 1 && g_duty <= 6) {
         if (val > 0) {
 #ifdef FLASHLIGHT_TIMING_FIX
             FL_Init();
             g_light_test = 1;
 #else
+//CEI comments end
+		    //CEI comments start
+            
             timerInit();
+            //CEI comments end
+            //CEI comments tart
 #endif
+            
 		    FL_dim_duty(g_duty);
+            //CEI comments end		
 		    FL_Enable();
 		    g_flash = 1;
    	    } else {
@@ -761,16 +789,24 @@ static ssize_t flashlight_torch_store(struct device *dev,
 		return ret;
     printk("%s: val=%lu\n", __func__, val);
     if (val > 0) {
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
         FL_Init();
 #else
+		//CEI comments start
+        
         timerInit();
+        //CEI comments end
 #endif
+//CEI comments end
 		FL_dim_duty(0);
 		FL_Enable();
 		g_torch = 1;
    	} else {
    		FL_Disable();
+//CEI comments start
+
 #ifdef FLASHLIGHT_TIMING_FIX
 		FL_Uninit();
 #endif
@@ -780,10 +816,16 @@ static ssize_t flashlight_torch_store(struct device *dev,
 	return size;
 }
 static DEVICE_ATTR(torch, 0644, flashlight_torch_show, flashlight_torch_store);
+//CEI comments end
+//CEI comments tart
+
 static ssize_t flashlight_duty_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
+//CEI comments start
+
 	return sprintf(buf, "%u\n", (g_duty == -1) ? 0 : g_duty);
+//CEI comments end
 }
 
 static ssize_t flashlight_duty_store(struct device *dev,
@@ -801,6 +843,7 @@ static ssize_t flashlight_duty_store(struct device *dev,
 	return size;
 }
 static DEVICE_ATTR(duty, 0644, flashlight_duty_show, flashlight_duty_store);
+//CEI comments end
 static int flashlight_probe(struct platform_device *dev)
 {
 	int ret = 0, err = 0;
@@ -848,6 +891,8 @@ static int flashlight_probe(struct platform_device *dev)
 		logI("[flashlight_probe] device_create fail ~");
 		goto flashlight_probe_error;
 	}
+    //CEI comments start
+    
     ret = device_create_file(flashlight_device, &dev_attr_flash);
     if (ret) {
         printk(KERN_ERR "[flashlight]device_create_file flash failed\n");
@@ -858,11 +903,15 @@ static int flashlight_probe(struct platform_device *dev)
         printk(KERN_ERR "[flashlight]device_create_file torch failed\n");
 		        goto flashlight_probe_error;
     }
+    //CEI comments end
+    //CEI comments tart
+    
     ret = device_create_file(flashlight_device, &dev_attr_duty);
     if (ret) {
         printk(KERN_ERR "[flashlight]device_create_file duty failed\n");
 		        goto flashlight_probe_error;
     }
+    //CEI comments end
 	/* initialize members */
 	spin_lock_init(&flashlight_private.lock);
 	init_waitqueue_head(&flashlight_private.read_wait);

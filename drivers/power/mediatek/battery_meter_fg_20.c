@@ -69,8 +69,11 @@ int Enable_FGADC_LOG = BMLOG_INFO_LEVEL;
 /* ============================================================ // */
 BATTERY_METER_CONTROL battery_meter_ctrl = NULL;
 
+//CEI comment start//
+//MTK security patch: ANDROID-29008443
 /* static struct proc_dir_entry *proc_entry_fgadc; */
-static char proc_fgadc_data[32];
+// static char proc_fgadc_data[32];
+//CEI comment end//
 
 kal_bool gFG_Is_Charging = KAL_FALSE;
 kal_bool gFG_Is_Charging_init = KAL_FALSE;
@@ -98,6 +101,10 @@ static kal_bool init_flag;
 //For SP build later change tbat pull up resistor, and AP build change battery id pull up resistor
 extern int board_type_with_hw_id(void);
 
+int f_show_counter = 0;
+extern int fgr;
+char startup_info[80] = {0};
+
 //CAR_TUNE_VAL tuning
 int g_hwid_val = -1;
 static int __init get_hwid_from_cmdline(char* cmdline)
@@ -120,6 +127,7 @@ int get_car_tune_value(void)
 {
 	static int initialed = -1;
 	static int car_tune_val = 117; // TP/PQ meseaured
+
 	if(initialed  == -1)
 	{
 		//board_type = board_type_with_hw_id(); // for pmic.c initial early use __setup to get hwid
@@ -147,6 +155,66 @@ int get_car_tune_value(void)
 	}
 
 	bm_print(BM_LOG_CRTI, "LE(K)=> [get_car_tune_value] g_hwid_val=%d, car_tune_val=%d\n", g_hwid_val, car_tune_val);
+	return car_tune_val;
+}
+
+extern int cat_rtc_info(void);
+extern int echo_rtc_info(int val);
+int car_value_rtc = 0;
+int car_value_rtc_post = 0;
+
+int get_car_tune_value_rtc(void)
+{
+	static int initialed = -1;
+	static int car_tune_val = 117; // TP/PQ meseaured
+
+	if(initialed  == -1)
+	{
+		//board_type = board_type_with_hw_id(); // for pmic.c initial early use __setup to get hwid
+		switch(g_hwid_val)
+		{
+			case 0x1: //DP1
+			case 0x2: //DP2
+				car_tune_val = 118;
+				break;
+			case 0x3: //SP1 SP2
+				car_tune_val = 98;
+				break;
+			case 0x4: //AP
+				car_tune_val = 119;
+				break;
+			case 0x5: //TP
+			case 0x6: //PQ
+				car_tune_val = 117;
+				break;
+			default: //Not assigned to use default value
+				break;
+		}
+
+		initialed = 1;
+	}
+
+	if (car_value_rtc == 0)
+	{
+		car_value_rtc = cat_rtc_info();
+		if( (car_value_rtc == 101) ||(car_value_rtc == 104) || (car_value_rtc == 107) ||(car_value_rtc == get_car_tune_value()) )
+		{
+			car_tune_val = car_value_rtc;
+		}
+
+		if(g_platform_boot_mode == NORMAL_BOOT)
+		{
+			echo_rtc_info(0);
+			car_value_rtc_post = cat_rtc_info();
+		}
+	}
+	else
+	{
+		//ever gotten from rtc
+		car_tune_val = car_value_rtc;
+	}
+
+	bm_print(BM_LOG_CRTI, "LE(K)=> [get_car_tune_value_rtc] g_hwid_val=%d, car_tune_val=%d, car_value_rtc=%d, car_value_rtc_post=%d\n", g_hwid_val, car_tune_val, car_value_rtc, car_value_rtc_post);
 	return car_tune_val;
 }
 //CEI comment end//
@@ -764,6 +832,24 @@ signed int cei_fgauge_read_capacity_by_v(signed int voltage)
 
 	return ret_percent;
 }
+
+void fgr_get(int fgr)
+{
+	if((fgr >= 98) && (fgr <= 119))
+	{
+		batt_meter_cust_data.car_tune_value = fgr;
+		battery_log(BAT_LOG_FULL, "LE(K)=> APTB MOD=%d\n", batt_meter_cust_data.car_tune_value);
+	}
+	else
+	{
+		battery_log(BAT_LOG_FULL, "LE(K)=> APTB NOTHING!! (%d)\n", fgr);
+	}
+}
+
+int get_fcr(void)
+{
+	return batt_meter_cust_data.car_tune_value;
+}
 //CEI comments end//
 
 int __batt_meter_init_cust_data_from_cust_header(struct platform_device *dev)
@@ -1014,7 +1100,7 @@ int __batt_meter_init_cust_data_from_cust_header(struct platform_device *dev)
 //CEI comment start//
 //CAR_TUNE_VAL tuning
 //	batt_meter_cust_data.car_tune_value = CAR_TUNE_VALUE;
-	batt_meter_cust_data.car_tune_value = get_car_tune_value();
+	batt_meter_cust_data.car_tune_value = get_car_tune_value_rtc();
 //CEI comment end//
 
 	/* HW Fuel gague  */
@@ -1331,7 +1417,7 @@ int __batt_meter_init_cust_data_from_dt(struct platform_device *dev)
 	}
 #else
 //	batt_meter_cust_data.car_tune_value = CAR_TUNE_VALUE;
-	batt_meter_cust_data.car_tune_value = get_car_tune_value();
+	batt_meter_cust_data.car_tune_value = get_car_tune_value_rtc();
 	bm_debug("LE(K)=> Get car_tune_value: %d\n", batt_meter_cust_data.car_tune_value);
 #endif
 //CEI comment end//
@@ -2705,36 +2791,40 @@ signed int battery_meter_get_VSense(void)
 }
 
 /* ============================================================ // */
+//CEI comment start//
+//MTK security patch: ANDROID-29008443
 static ssize_t fgadc_log_write(struct file *filp, const char __user *buff,
 			       size_t len, loff_t *data)
 {
-	if (copy_from_user(&proc_fgadc_data, buff, len)) {
+	char proc_fgadc_data;
+
+	if ((len <= 0) || copy_from_user(&proc_fgadc_data, buff, 1)) {
 		bm_debug("fgadc_log_write error.\n");
 		return -EFAULT;
 	}
 
-	if (proc_fgadc_data[0] == '1') {
+	if (proc_fgadc_data == '1') {
 		bm_debug("enable FGADC driver log system\n");
 		Enable_FGADC_LOG = 1;
-	} else if (proc_fgadc_data[0] == '2') {
+	} else if (proc_fgadc_data == '2') {
 		bm_debug("enable FGADC driver log system:2\n");
 		Enable_FGADC_LOG = 2;
-	} else if (proc_fgadc_data[0] == '3') {
+	} else if (proc_fgadc_data == '3') {
 		bm_debug("enable FGADC driver log system:3\n");
 		Enable_FGADC_LOG = 3;
-	} else if (proc_fgadc_data[0] == '4') {
+	} else if (proc_fgadc_data == '4') {
 		bm_debug("enable FGADC driver log system:4\n");
 		Enable_FGADC_LOG = 4;
-	} else if (proc_fgadc_data[0] == '5') {
+	} else if (proc_fgadc_data == '5') {
 		bm_debug("enable FGADC driver log system:5\n");
 		Enable_FGADC_LOG = 5;
-	} else if (proc_fgadc_data[0] == '6') {
+	} else if (proc_fgadc_data == '6') {
 		bm_debug("enable FGADC driver log system:6\n");
 		Enable_FGADC_LOG = 6;
-	} else if (proc_fgadc_data[0] == '7') {
+	} else if (proc_fgadc_data == '7') {
 		bm_debug("enable FGADC driver log system:7\n");
 		Enable_FGADC_LOG = 7;
-	} else if (proc_fgadc_data[0] == '8') {
+	} else if (proc_fgadc_data == '8') {
 		bm_debug("enable FGADC driver log system:8\n");
 		Enable_FGADC_LOG = 8;
 	} else {
@@ -2744,6 +2834,7 @@ static ssize_t fgadc_log_write(struct file *filp, const char __user *buff,
 
 	return len;
 }
+//CEI comment end//
 
 static const struct file_operations fgadc_proc_fops = {
 	.write = fgadc_log_write,
@@ -3250,6 +3341,107 @@ static ssize_t store_TM(struct device *dev,struct device_attribute *attr, const 
    return size;
 }
 static DEVICE_ATTR(TM, 0664, show_TM, store_TM);
+
+
+extern int f_rname;
+int data_log_level = 3;
+
+static ssize_t show_fg_start(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	bm_trace("[FG] show_fg_start APTB\n");
+	f_show_counter = 0;
+	return sprintf(buf, "start OK!\n");
+}
+static ssize_t store_fg_start(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+static DEVICE_ATTR(fg_start, 0664, show_fg_start, store_fg_start);
+
+static ssize_t show_fg_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t size = 0;
+
+	if(f_show_counter > 39)
+		f_show_counter = 39;
+
+	size = sprintf(buf, "%d %d %d %d\n", 0, 0, 0, 0);
+
+	f_show_counter++;
+
+	bm_print(BM_LOG_FULL, "[FG] [show_fg_show] LE(K)=> APTB %s\n", buf);
+
+	return size;
+}
+static ssize_t store_fg_show(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+static DEVICE_ATTR(fg_show, 0664, show_fg_show, store_fg_show);
+
+static ssize_t show_fgr(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t size = 0;
+
+	if(fgr == -1)
+	{
+		size = sprintf(buf, "Waiting (%d)(%d)(%d)\n", fgr, car_value_rtc, cat_rtc_info());
+	}
+	else
+	{
+		char buf1[20] = {0};
+
+		if (f_rname == 1)
+			snprintf(buf1, sizeof(buf1), "N");
+		else if (f_rname == 2)
+			snprintf(buf1, sizeof(buf1), "A");
+		else
+			snprintf(buf1, sizeof(buf1), "U");
+
+		size = sprintf(buf, "Done (%d)(%s)(%d)(%d)(%d)\n", fgr, buf1, batt_meter_cust_data.car_tune_value, car_value_rtc, cat_rtc_info());
+	}
+
+	bm_print(BM_LOG_FULL, "[FG] [fgr] LE(K)=> APTB %s\n", buf);
+
+	return size;
+}
+static ssize_t store_fgr(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+static DEVICE_ATTR(fgr, 0664, show_fgr, store_fgr);
+
+static ssize_t show_data_log_level(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t size = 0;
+#if 0
+	data_log_level++;
+	if(data_log_level >= 4)
+		data_log_level = 0;
+#endif
+
+	if(data_log_level == 0)
+		size = sprintf(buf, "Log disabled!\n");
+	else if(data_log_level == 1)
+		size = sprintf(buf, "Log enaled!\n");
+	else if(data_log_level == 2)
+		size = sprintf(buf, "Log active1!\n");
+	else if(data_log_level == 3)
+		size = sprintf(buf, "Log active2!\n");
+	else
+		size = sprintf(buf, "Nothing!\n");
+
+	bm_print(BM_LOG_FULL, "[FG] [show_data_log_level] LE(K)=> APTB %s\n", buf);
+
+	return size;
+}
+
+static ssize_t store_data_log_level(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	return size;
+}
+static DEVICE_ATTR(data_log_level, 0664, show_data_log_level, store_data_log_level);
+
 //CEI comments end//
 
 /* ============================================================ // */
@@ -3937,6 +4129,10 @@ static int battery_meter_probe(struct platform_device *dev)
 	ret_device_file = device_create_file(&(dev->dev), &dev_attr_CHDrvVersion);
 	ret_device_file = device_create_file(&(dev->dev), &dev_attr_BMTbat_vol);
 	ret_device_file = device_create_file(&(dev->dev), &dev_attr_TM);
+	ret_device_file = device_create_file(&(dev->dev), &dev_attr_fg_start);
+	ret_device_file = device_create_file(&(dev->dev), &dev_attr_fg_show);
+	ret_device_file = device_create_file(&(dev->dev), &dev_attr_fgr);
+	ret_device_file = device_create_file(&(dev->dev), &dev_attr_data_log_level);
 //CEI comments end//
 	
 	ret_device_file = device_create_file(&(dev->dev), &dev_attr_FG_g_fg_dbg_bat_volt);
@@ -4075,11 +4271,14 @@ static int battery_meter_suspend(struct platform_device *dev, pm_message_t state
 }
 
 //CEI comments start//
-void get_FG_Current(void)
+int get_FG_Current(void)
 {
 	signed int ret=0;
 	signed int val=0;
 	kal_bool is_charging=0;
+
+	if (battery_meter_ctrl == NULL)
+		return 0;
 
 	ret = battery_meter_ctrl(BATTERY_METER_CMD_GET_HW_FG_CURRENT, &val);
 	ret = battery_meter_ctrl(BATTERY_METER_CMD_GET_HW_FG_CURRENT_SIGN, &is_charging);
@@ -4091,7 +4290,9 @@ void get_FG_Current(void)
 	{
 		gFG_suspend_current = val;
 	}
-	bm_print(BM_LOG_CRTI, "[get_FG_Current] gFG_suspend_current=%d is_charging=%d\n", gFG_suspend_current, is_charging);
+	bm_print(BM_LOG_FULL, "[get_FG_Current] gFG_suspend_current=%d is_charging=%d\n", gFG_suspend_current, is_charging);
+
+	return gFG_suspend_current;
 }
 EXPORT_SYMBOL(get_FG_Current);
 //CEI comments end//

@@ -1677,11 +1677,13 @@ static irqreturn_t mtk_uart_irq(int irq, void *dev_id)
 
 #ifndef CONFIG_FIQ_DEBUGGER
 #ifdef CONFIG_MT_PRINTK_UART_CONSOLE
+#ifndef DISABLE_UART_LOG
 	unsigned long base;
 
 	base = uart->base;
 	if ((uart == console_port) && (UART_READ32(UART_LSR) & 0x01))
 		printk_disable_uart = 0;
+#endif
 #endif
 #endif
 

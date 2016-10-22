@@ -1073,6 +1073,59 @@ void bq25890_dump_register(void)
 
 }
 
+unsigned int bq25890_dump_register_get_data(void)
+{
+	unsigned char i = 0;
+	unsigned char ichg = 0;
+	unsigned char ichg_reg = 0;
+	unsigned char iinlim = 0;
+	unsigned char vbat = 0;
+	unsigned char chrg_state = 0;
+	unsigned char chr_en = 0;
+	unsigned char vbus = 0;
+	unsigned char vdpm = 0;
+	unsigned char fault = 0;
+	unsigned int bq_ibat = 0;
+
+	bq25890_ADC_start(1);
+
+	for (i = 0; i < bq25890_REG_NUM/7; i++) {
+		int j;
+		unsigned char bq25890_reg_buf[7];
+		memset(bq25890_reg_buf, 0x0, sizeof(bq25890_reg_buf));
+		for(j = 0; j < 7; j++)
+		{
+			bq25890_read_byte((i*7)+j, &bq25890_reg_buf[j]);
+		}
+
+		battery_log(BAT_LOG_CRTI, "LE(K)=> [bq25890 reg@][0x%x]=0x%x [0x%x]=0x%x [0x%x]=0x%x [0x%x]=0x%x [0x%x]=0x%x [0x%x]=0x%x [0x%x]=0x%x\n",
+					(i*7)+0, bq25890_reg_buf[0], (i*7)+1, bq25890_reg_buf[1], (i*7)+2, bq25890_reg_buf[2],
+					(i*7)+3, bq25890_reg_buf[3], (i*7)+4, bq25890_reg_buf[4], (i*7)+5, bq25890_reg_buf[5],
+					(i*7)+6, bq25890_reg_buf[6]);
+	}
+
+	bq25890_ADC_start(1);
+	iinlim = bq25890_get_iinlim();
+	chrg_state = bq25890_get_chrg_state();
+	chr_en = bq25890_get_chg_en();
+	ichg_reg = bq25890_get_reg_ichg();
+	ichg = bq25890_get_ichg();
+	vbat = bq25890_get_vbat();
+	vbus = bq25890_get_vbus();
+	vdpm = bq25890_get_vdpm_state();
+	fault = bq25890_get_chrg_fault_state();
+	battery_log(BAT_LOG_CRTI,
+		    "[PE+]BQ25896 Ichg_reg=%d mA, Iinlin=%d mA, Vbus=%d mV, err=%d",
+		     ichg_reg * 64, iinlim * 50 + 100, vbus * 100 + 2600, fault);
+	battery_log(BAT_LOG_CRTI, "[PE+]BQ25896 Ichg=%d mA, Vbat =%d mV, ChrStat=%d, CHGEN=%d, VDPM=%d\n",
+		    ichg * 50, vbat * 20 + 2304, chrg_state, chr_en, vdpm);
+
+	bq_ibat = ichg * 50;
+
+	return bq_ibat;
+}
+
+
 void bq25890_hw_init(void)
 {
 	/*battery_log(BAT_LOG_CRTI, "[bq25890_hw_init] After HW init\n");*/

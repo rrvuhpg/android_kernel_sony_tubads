@@ -686,6 +686,7 @@ static const struct ieee80211_txrx_stypes
 	
 };
 
+//[DMS06709097] Screen mirroring fail when connect with 5G wifi AP ST
 static const struct ieee80211_iface_limit mtk_p2p_iface_limits[] = {
 	{
 		.max = 1,
@@ -707,8 +708,10 @@ static const struct ieee80211_iface_combination mtk_p2p_iface_combos[] = {
 		.limits = mtk_p2p_iface_limits
 	}
 };
+//[DMS06709097] Screen mirroring fail when connect with 5G wifi AP ED
 #endif
 
+#if 0
 /* the legacy wireless extension stuff */
 static const iw_handler rP2PIwStandardHandler[] = {
 	[SIOCGIWPRIV - SIOCIWFIRST] = mtk_p2p_wext_get_priv,
@@ -724,7 +727,9 @@ static const iw_handler rP2PIwStandardHandler[] = {
 #endif
 	[SIOCSIWMLME - SIOCIWFIRST] = mtk_p2p_wext_mlme_handler,
 };
+#endif
 
+#if 0
 static const iw_handler rP2PIwPrivHandler[] = {
 	[IOC_P2P_CFG_DEVICE - SIOCIWFIRSTPRIV] = mtk_p2p_wext_set_local_dev_info,
 	[IOC_P2P_PROVISION_COMPLETE - SIOCIWFIRSTPRIV] = mtk_p2p_wext_set_provision_complete,
@@ -739,6 +744,7 @@ static const iw_handler rP2PIwPrivHandler[] = {
 	[IOC_P2P_SET_STRUCT - SIOCIWFIRSTPRIV] = mtk_p2p_wext_set_struct,
 	[IOC_P2P_GET_REQ_DEVICE_INFO - SIOCIWFIRSTPRIV] = mtk_p2p_wext_request_dev_info,
 };
+#endif
 
 static const struct iw_priv_args rP2PIwPrivTable[] = {
 	{
@@ -810,6 +816,7 @@ static const struct iw_priv_args rP2PIwPrivTable[] = {
 	 .name = "get_oid"}
 };
 
+#if 0
 const struct iw_handler_def mtk_p2p_wext_handler_def = {
 	.num_standard = (__u16) sizeof(rP2PIwStandardHandler) / sizeof(iw_handler),
 	.num_private = (__u16) sizeof(rP2PIwPrivHandler) / sizeof(iw_handler),
@@ -823,6 +830,7 @@ const struct iw_handler_def mtk_p2p_wext_handler_def = {
 	.get_wireless_stats = NULL,
 #endif
 };
+#endif
 
 #ifdef CONFIG_PM
 static const struct wiphy_wowlan_support p2p_wowlan_support = {
@@ -1200,8 +1208,10 @@ BOOLEAN glP2pCreateWirelessDevice(P_GLUE_INFO_T prGlueInfo)
 
 	prWiphy->interface_modes = BIT(NL80211_IFTYPE_AP) | BIT(NL80211_IFTYPE_P2P_CLIENT) |
 						BIT(NL80211_IFTYPE_P2P_GO) | BIT(NL80211_IFTYPE_STATION);
+	//[DMS06709097] Screen mirroring fail when connect with 5G wifi AP
 	prWiphy->iface_combinations = mtk_p2p_iface_combos;
 	prWiphy->n_iface_combinations = ARRAY_SIZE(mtk_p2p_iface_combos);
+	//[DMS06709097] Screen mirroring fail when connect with 5G wifi APED
 
 	prWiphy->bands[IEEE80211_BAND_2GHZ] = &mtk_band_2ghz;
 	prWiphy->bands[IEEE80211_BAND_5GHZ] = &mtk_band_5ghz;
@@ -1896,11 +1906,12 @@ int p2pDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 {
 	P_GLUE_INFO_T prGlueInfo = NULL;
 	int ret = 0;
+#if 0
 	char *prExtraBuf = NULL;
 	UINT_32 u4ExtraSize = 0;
 	struct iwreq *prIwReq = (struct iwreq *)prIfReq;
 	struct iw_request_info rIwReqInfo;
-
+#endif
 	ASSERT(prDev && prIfReq);
 
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
@@ -1914,6 +1925,15 @@ int p2pDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 		return -EINVAL;
 	}
 
+	if (i4Cmd == SIOCDEVPRIVATE + 1) {
+		ret = priv_support_driver_cmd(prDev, prIfReq, i4Cmd);
+
+	} else {
+		DBGLOG(INIT, WARN, "Unexpected ioctl command: 0x%04x\n", i4Cmd);
+		ret = -1;
+	}
+
+#if 0
 	rIwReqInfo.cmd = (__u16) i4Cmd;
 	rIwReqInfo.flags = 0;
 
@@ -2014,10 +2034,70 @@ int p2pDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 	default:
 		ret = -ENOTTY;
 	}
+#endif
 
 	return ret;
 }				/* end of p2pDoIOCTL() */
 
+/*----------------------------------------------------------------------------*/
+/*!
+ * \brief To override p2p interface address
+ *
+ * \param[in] prDev Net device requested.
+ * \param[in] addr  Pointer to address
+ *
+ * \retval 0 For success.
+ * \retval -E2BIG For user's buffer size is too small.
+ * \retval -EFAULT For fail.
+ *
+ */
+/*----------------------------------------------------------------------------*/
+int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
+{
+	P_ADAPTER_T prAdapter = NULL;
+	P_GLUE_INFO_T prGlueInfo = NULL;
+
+	ASSERT(prDev);
+
+	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
+	ASSERT(prGlueInfo);
+
+	prAdapter = prGlueInfo->prAdapter;
+	ASSERT(prAdapter);
+
+	/* @FIXME */
+	return eth_mac_addr(prDev, addr);
+}
+
+/*----------------------------------------------------------------------------*/
+/*!
+* \brief indicate an event to supplicant for device found
+*
+* \param[in] prGlueInfo Pointer of GLUE_INFO_T
+*
+* \retval TRUE  Success.
+* \retval FALSE Failure
+*/
+/*----------------------------------------------------------------------------*/
+BOOLEAN kalP2PIndicateFound(IN P_GLUE_INFO_T prGlueInfo)
+{
+	union iwreq_data evt;
+	UINT_8 aucBuffer[IW_CUSTOM_MAX];
+
+	ASSERT(prGlueInfo);
+
+	memset(&evt, 0, sizeof(evt));
+
+	snprintf(aucBuffer, IW_CUSTOM_MAX - 1, "P2P_DVC_FND");
+	evt.data.length = strlen(aucBuffer);
+
+	/* indicate IWEVP2PDVCFND event */
+	wireless_send_event(prGlueInfo->prP2PInfo->prDevHandler, IWEVCUSTOM, &evt, aucBuffer);
+
+	return FALSE;
+}				/* end of kalP2PIndicateFound() */
+
+#if 0
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief To report the iw private args table to user space.
@@ -2509,36 +2589,6 @@ mtk_p2p_wext_invitation_abort(IN struct net_device *prDev,
 }
 
 /* mtk_p2p_wext_invitation_abort */
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief To override p2p interface address
- *
- * \param[in] prDev Net device requested.
- * \param[in] addr  Pointer to address
- *
- * \retval 0 For success.
- * \retval -E2BIG For user's buffer size is too small.
- * \retval -EFAULT For fail.
- *
- */
-/*----------------------------------------------------------------------------*/
-int p2pSetMACAddress(IN struct net_device *prDev, void *addr)
-{
-	P_ADAPTER_T prAdapter = NULL;
-	P_GLUE_INFO_T prGlueInfo = NULL;
-
-	ASSERT(prDev);
-
-	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
-	ASSERT(prGlueInfo);
-
-	prAdapter = prGlueInfo->prAdapter;
-	ASSERT(prAdapter);
-
-	/* @FIXME */
-	return eth_mac_addr(prDev, addr);
-}
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -3459,34 +3509,6 @@ mtk_p2p_wext_invitation_status(IN struct net_device *prDev,
 
 	return 0;
 }				/* end of mtk_p2p_wext_invitation_status() */
-
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief indicate an event to supplicant for device found
-*
-* \param[in] prGlueInfo Pointer of GLUE_INFO_T
-*
-* \retval TRUE  Success.
-* \retval FALSE Failure
-*/
-/*----------------------------------------------------------------------------*/
-BOOLEAN kalP2PIndicateFound(IN P_GLUE_INFO_T prGlueInfo)
-{
-	union iwreq_data evt;
-	UINT_8 aucBuffer[IW_CUSTOM_MAX];
-
-	ASSERT(prGlueInfo);
-
-	memset(&evt, 0, sizeof(evt));
-
-	snprintf(aucBuffer, IW_CUSTOM_MAX - 1, "P2P_DVC_FND");
-	evt.data.length = strlen(aucBuffer);
-
-	/* indicate IWEVP2PDVCFND event */
-	wireless_send_event(prGlueInfo->prP2PInfo->prDevHandler, IWEVCUSTOM, &evt, aucBuffer);
-
-	return FALSE;
-}				/* end of kalP2PIndicateFound() */
 
 int
 mtk_p2p_wext_set_network_address(IN struct net_device *prDev,
@@ -4720,3 +4742,5 @@ mtk_p2p_wext_set_txpow(IN struct net_device *prDev,
 
 	return i4Ret;
 }				/* mtk_p2p_wext_set_txpow */
+
+#endif

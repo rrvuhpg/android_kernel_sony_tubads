@@ -34,7 +34,7 @@ static unsigned long g_u4TargetPosition;
 static unsigned long g_u4CurrPosition;
 static int g_sr = 0;
 
-//[VY36] ==>
+
 void DW9714AF_WriteReg_Pwdn(struct i2c_client *pstAF_I2Cclient, u16 a_u2Data)
 {
            int i4RetValue = 0;
@@ -52,7 +52,7 @@ void DW9714AF_WriteReg_Pwdn(struct i2c_client *pstAF_I2Cclient, u16 a_u2Data)
                      LOG_INF("I2C send failed!!\n");
            }
 }
-//[VY36] <==
+
 
 static int s4AF_ReadReg(unsigned short *a_pu2Result)
 {
@@ -80,7 +80,7 @@ static int s4AF_WriteReg(u16 a_u2Data)
 	int i4RetValue = 0;
 
 	//char puSendCmd[2] = { (char)(a_u2Data >> 4), (char)((a_u2Data & 0xF) << 4) };
-	char puSendCmd[2] = { (char)(a_u2Data >> 4), (char)(((a_u2Data & 0xF) << 4) + g_sr) }; //[VY36] lsc mode
+	char puSendCmd[2] = { (char)(a_u2Data >> 4), (char)(((a_u2Data & 0xF) << 4) + g_sr) }; 
 
 	g_pstAF_I2Cclient->addr = AF_I2C_SLAVE_ADDR;
 
@@ -146,7 +146,7 @@ static inline int moveAF(unsigned long a_u4Position)
 	if (*g_pAF_Opened == 1) {
 		unsigned short InitPos=0;
 
-               //[VY36] ==> lsc mode for reduce lens noise - S
+               
                 ret = s4AF_ReadReg(&InitPos);
                 if (InitPos > 1023)
                     InitPos = 0;
@@ -157,7 +157,7 @@ static inline int moveAF(unsigned long a_u4Position)
                i2c_master_send(g_pstAF_I2Cclient, puSendCmd2, 2);
                i2c_master_send(g_pstAF_I2Cclient, puSendCmd3, 2);
                i2c_master_send(g_pstAF_I2Cclient, puSendCmd4, 2);
-               //[VY36] <== lsc mode for reduce lens noise - E
+               
 
 		if (ret == 0) {
 			LOG_INF("Init Pos %6d\n", InitPos);
@@ -259,7 +259,7 @@ int DW9714AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 
 	if (*g_pAF_Opened == 2) {
 		LOG_INF("Wait\n");
-                //[VY36] ==> lsc mode for reduce lens noise - S
+                
                 g_sr = 5;
 		s4AF_WriteReg(200);
 		LOG_INF("200\n");
@@ -285,7 +285,7 @@ int DW9714AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 		s4AF_WriteReg(0);
 		LOG_INF("0\n");
 		msleep(10);
-                //[VY36] <== lsc mode for reduce lens noise - E
+                
 	}
 
 	if (*g_pAF_Opened) {
@@ -296,7 +296,7 @@ int DW9714AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 		spin_unlock(g_pAF_SpinLock);
 	}
 
-	DW9714AF_WriteReg_Pwdn(g_pstAF_I2Cclient, 32768); //[VY36] Switch to Pwdn
+	DW9714AF_WriteReg_Pwdn(g_pstAF_I2Cclient, 32768); 
 	LOG_INF("End\n");
 
 	return 0;

@@ -2509,6 +2509,10 @@ void wlanHandleSystemSuspend(void)
 #endif
 	UINT_32 i;
 	P_PARAM_NETWORK_ADDRESS_IP prParamIpAddr;
+#if CFG_SUPPORT_DROP_MC_PACKET
+	UINT_32 u4PacketFilter = 0;
+	UINT_32 u4SetInfoLen = 0;
+#endif
 
 	/* <1> Sanity check and acquire the net_device */
 	ASSERT(u4WlanDevNum <= CFG_MAX_WLAN_DEVICES);
@@ -2522,6 +2526,18 @@ void wlanHandleSystemSuspend(void)
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
 	ASSERT(prGlueInfo);
 
+#if CFG_SUPPORT_DROP_MC_PACKET
+	/* new filter should not include p2p mask */
+#if CFG_ENABLE_WIFI_DIRECT_CFG_80211
+	u4PacketFilter = prGlueInfo->prAdapter->u4OsPacketFilter & (~PARAM_PACKET_FILTER_P2P_MASK);
+#endif
+	if (kalIoctl(prGlueInfo,
+		 wlanoidSetCurrentPacketFilter,
+		 &u4PacketFilter,
+		 sizeof(u4PacketFilter), FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen) != WLAN_STATUS_SUCCESS) {
+		DBGLOG(INIT, ERROR, "set packet filter failed.\n");
+	}
+#endif
 	if (!prDev || !(prDev->ip_ptr) ||
 	    !((struct in_device *)(prDev->ip_ptr))->ifa_list ||
 	    !(&(((struct in_device *)(prDev->ip_ptr))->ifa_list->ifa_local))) {
@@ -2593,8 +2609,8 @@ void wlanHandleSystemSuspend(void)
 
 notify_suspend:
 	DBGLOG(INIT, INFO, "IP: %d.%d.%d.%d, rStatus: %u\n", ip[0], ip[1], ip[2], ip[3], rStatus);
-	if (rStatus != WLAN_STATUS_SUCCESS)
-		wlanNotifyFwSuspend(prGlueInfo, TRUE);
+	//ALPS02739347 set packet filter FW determine suspend
+	wlanNotifyFwSuspend(prGlueInfo, TRUE);
 }
 
 void wlanHandleSystemResume(void)
@@ -2608,6 +2624,10 @@ void wlanHandleSystemResume(void)
 #endif
 	EVENT_AIS_BSS_INFO_T rParam;
 	UINT_32 u4BufLen = 0;
+#if CFG_SUPPORT_DROP_MC_PACKET
+	UINT_32 u4PacketFilter = 0;
+	UINT_32 u4SetInfoLen = 0;
+#endif
 
 	/* <1> Sanity check and acquire the net_device */
 	ASSERT(u4WlanDevNum <= CFG_MAX_WLAN_DEVICES);
@@ -2628,6 +2648,18 @@ void wlanHandleSystemResume(void)
 	prGlueInfo = *((P_GLUE_INFO_T *) netdev_priv(prDev));
 	ASSERT(prGlueInfo);
 
+#if CFG_SUPPORT_DROP_MC_PACKET
+	/* new filter should not include p2p mask */
+#if CFG_ENABLE_WIFI_DIRECT_CFG_80211
+	u4PacketFilter = prGlueInfo->prAdapter->u4OsPacketFilter & (~PARAM_PACKET_FILTER_P2P_MASK);
+#endif
+	if (kalIoctl(prGlueInfo,
+		 wlanoidSetCurrentPacketFilter,
+		 &u4PacketFilter,
+		 sizeof(u4PacketFilter), FALSE, FALSE, TRUE, FALSE, &u4SetInfoLen) != WLAN_STATUS_SUCCESS) {
+		DBGLOG(INIT, ERROR, "set packet filter failed.\n");
+	}
+#endif
 	/*
 	   We will receive the event in rx, we will check if the status is the same in driver
 	   and FW, if not the same, trigger disconnetion procedure.
@@ -2689,9 +2721,8 @@ notify_resume:
 	DBGLOG(INIT, INFO, "Query BSS result: %d %d %d, IP: %d.%d.%d.%d, rStatus: %u\n",
 		       rParam.eConnectionState, rParam.eCurrentOPMode, rParam.fgIsNetActive,
 		       ip[0], ip[1], ip[2], ip[3], rStatus);
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		wlanNotifyFwSuspend(prGlueInfo, FALSE);
-	}
+	//ALPS02739347 set packet filter FW determine suspend
+	wlanNotifyFwSuspend(prGlueInfo, FALSE);
 }
 #endif /* ! CONFIG_X86 */
 

@@ -109,7 +109,7 @@ extern int get_car_tune_value(void);
 //CEI comment start//
 #define BATTERYPSEUDO100	99
 //CEI comment end//
-#define BATTERYPSEUDO1 6
+#define BATTERYPSEUDO1 2
 
 //CEI comment start//
 #define Q_MAX_BY_SYS			/*8. Qmax variant by system drop voltage.*/

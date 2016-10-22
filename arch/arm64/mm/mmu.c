@@ -40,11 +40,11 @@
 
 #include "mm.h"
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/cciklog.h>
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 /*
  * Empty_zero_page is a special page that is used for zero-initialized data
@@ -459,7 +459,7 @@ static void __init map_mem(void)
 #endif
 		__map_memblock(start, end);
 	}
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 /*
 	MTK_MEMCFG_LOG_AND_PRINTK(KERN_ALERT
@@ -472,7 +472,7 @@ static void __init map_mem(void)
 	create_mapping((unsigned long long)CCI_KLOG_START_ADDR_PHYSICAL, (unsigned long)MSM_KLOG_BASE, (unsigned long long)CCI_KLOG_SIZE,PAGE_KERNEL);
 	cklc_set_memory_ready();
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	/* Limit no longer required. */
 	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);

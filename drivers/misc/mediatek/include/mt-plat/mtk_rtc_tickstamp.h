@@ -27,6 +27,8 @@
 #include <linux/workqueue.h>
 #include <linux/mutex.h>
 
+#define MAX_STAMP ((unsigned long)-1)
+
 typedef unsigned long (*ticker_func)(void);
 typedef void (*ts_worker_func)(struct work_struct *);
 
@@ -40,7 +42,7 @@ struct ts_work_struct {
  * we'd like to extend it in the future
  */
 struct tick_stamp {
-	long epoch;
+	unsigned long epoch;
 };
 
 /**
@@ -58,7 +60,7 @@ bool ts_init(ticker_func ticker_fn);
  * ts_get - get last system tickstamp
  * @epoch: epoch time format of last set tickstamp
  */
-void ts_get(long *epoch);
+void ts_get(unsigned long *epoch);
 
 /**
  * ts_set - writes tickstamp to VFS

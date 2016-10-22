@@ -45,14 +45,14 @@
 #include <linux/of_address.h>
 #endif
 
-//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 //#include <cust_gpio_usage.h>
 //#include <cust_eint.h>
 //#include <mach/mt_gpio.h>
 //#include <mach/eint.h>
 
 #define PN547_USE_KERNEL_STD
-//E [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 
 #define MAX_BUFFER_SIZE 512
 
@@ -63,7 +63,7 @@ static bool do_reading;
 static bool cancle_read;
 #endif
 
-#define NFC_DEBUG 1
+#define NFC_DEBUG 0
 #define MAX_TRY_I2C_READ 10
 #define I2C_ADDR_READ_L 0x51
 #define I2C_ADDR_READ_H 0x57
@@ -102,7 +102,7 @@ struct pn547_i2c_platform_data {
 		unsigned int firm_gpio;
 };
 
-//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 
 #if defined(PN547_USE_KERNEL_STD)
 
@@ -351,7 +351,7 @@ static int mt_nfc_remove(struct platform_device *pdev)
 }
 
 #endif//PN547_USE_KERNEL_STD
-//E [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 
 //static void pn547_dev_irq_handler(void)
 static irqreturn_t pn547_dev_irq_handler(int irq, void *data)	/*IRQ handler */
@@ -363,7 +363,7 @@ static irqreturn_t pn547_dev_irq_handler(int irq, void *data)	/*IRQ handler */
 			return IRQ_HANDLED;
 		}
 
-//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 #if defined(PN547_USE_KERNEL_STD)
 		if(!mt_nfc_get_gpio_value(pn547_dev->irq_gpio)) {
 				#if NFC_DEBUG
@@ -372,7 +372,7 @@ static irqreturn_t pn547_dev_irq_handler(int irq, void *data)	/*IRQ handler */
 				return IRQ_HANDLED;
 		}				
 #else
-//E [VY36 M] JackBB 2015/10/12 Kernel standardization		
+
 		if (!mt_get_gpio_in(pn547_dev->irq_gpio)) {
 				#if NFC_DEBUG
 				pr_err("%s, irq_gpio = %d\n", __func__, mt_get_gpio_in(pn547_dev->irq_gpio));
@@ -387,7 +387,7 @@ static irqreturn_t pn547_dev_irq_handler(int irq, void *data)	/*IRQ handler */
 		#endif
 		
 		//!!!Temp
-		//pn547_disable_irq(nfc_irq);//[VY36 M] JackBB 2015/10/12 Kernel standardization
+		//pn547_disable_irq(nfc_irq);
 		//!!!Temp
 		
 		/* Wake up waiting readers */
@@ -407,17 +407,17 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf, size_t count,
 		char tmp[MAX_BUFFER_SIZE];
 		#endif
 		int ret = 0;
-//B: 20140221, BugID1920: Cannot pair with SBH52 via NFC  
+
 #if 0
 		int readingWatchdog = 0;
 #endif
-//E: 20140221, BugID1920: Cannot pair with SBH52 via NFC  
+
 		
 		if (count > MAX_BUFFER_SIZE)
 			count = MAX_BUFFER_SIZE;
 		
 		#if NFC_DEBUG
-		//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+		
 #if defined(PN547_USE_KERNEL_STD)
 		dev_info(&pn547_dev->client->dev, "%s : reading %zu bytes. irq=%s\n",	__func__, count, 
 																	mt_nfc_get_gpio_value(pn547_dev->irq_gpio) ? "1" : "0");
@@ -432,20 +432,20 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf, size_t count,
 		mutex_lock(&pn547_dev->read_mutex);
 		
 		//!!!Temp
-		//pn547_enable_irq(nfc_irq);//[VY36 M] JackBB 2015/10/12 Kernel standardization
+		//pn547_enable_irq(nfc_irq);
 		//!!!Temp
 		
-//B: 20140221, BugID1920: Cannot pair with SBH52 via NFC  
+
 #if 0		
 		wait_irq:
 #endif
-//E: 20140221, BugID1920: Cannot pair with SBH52 via NFC
 
-//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+
+
 #if defined(PN547_USE_KERNEL_STD)
 		if(!mt_nfc_get_gpio_value(pn547_dev->irq_gpio)){
 #else
-//E [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 		if (!mt_get_gpio_in(pn547_dev->irq_gpio)) {
 #endif//		PN547_USE_KERNEL_STD
 			#ifdef NXP_KR_READ_IRQ_MODIFY
@@ -498,7 +498,7 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf, size_t count,
 		/* If bad frame(from 0x51 to 0x57) is received from pn547,
 		* we need to read again after waiting that IRQ is down.
 		* if data is not ready, pn547 will send from 0x51 to 0x57. */
-//B: 20140221, BugID1920: Cannot pair with SBH52 via NFC
+
 #if 0
 		if ((I2C_ADDR_READ_L <= tmp[0] && tmp[0] <= I2C_ADDR_READ_H)
 		&& readingWatchdog < MAX_TRY_I2C_READ) {
@@ -509,7 +509,7 @@ static ssize_t pn547_dev_read(struct file *filp, char __user *buf, size_t count,
 				goto wait_irq;
 		}
 #endif
-//E: 20140221, BugID1920: Cannot pair with SBH52 via NFC		
+
 		mutex_unlock(&pn547_dev->read_mutex);
 		
 		if (ret < 0) {
@@ -571,13 +571,13 @@ static ssize_t pn547_dev_write(struct file *filp, const char __user *buf, size_t
 		#endif
 
 		if (atomic_read(&pn547_dev->irq_enabled) == 1) {
-//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 #if defined(PN547_USE_KERNEL_STD)
 			pn547_disable_irq(nfc_irq);
 #else
 			mt_eint_mask(CUST_EINT_IRQ_NFC_NUM);
 #endif
-//E [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 			atomic_set(&pn547_dev->irq_enabled, 0);
 		}
 
@@ -625,13 +625,13 @@ static ssize_t pn547_dev_write(struct file *filp, const char __user *buf, size_t
 
 		if (atomic_read(&pn547_dev->irq_enabled) == 0) {
 			atomic_set(&pn547_dev->irq_enabled, 1);
-//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+
 #if defined(PN547_USE_KERNEL_STD)
 			pn547_enable_irq(nfc_irq);
 #else
 			mt_eint_unmask(CUST_EINT_IRQ_NFC_NUM);
 #endif
-//E [VY36 M] JackBB 2015/10/12 Kernel standardization			
+
 			
 		}
 
@@ -654,14 +654,14 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 {
 		struct pn547_dev *pn547_dev = filp->private_data;
 #if defined(PN547_USE_KERNEL_STD)			
-		int ret = 0;//[VY36 M] JackBB 2015/10/12 Kernel standardization	
+		int ret = 0;
 #endif//PN547_USE_KERNEL_STD
 
 		switch (cmd) {
 				case PN547_SET_PWR:
 						if (arg == 2) {
 								/* power on with firmware download (requires hw reset) */
-								//S [VY36 M] JackBB 2015/10/12 Kernel standardization			
+								
 #if defined(PN547_USE_KERNEL_STD)										
 								ret = mt_nfc_pinctrl_select(gpctrl, st_ven_h);
 								ret = mt_nfc_pinctrl_select(gpctrl, st_eint_h);		
@@ -675,7 +675,7 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 										pn547_enable_irq(nfc_irq);
 								}								
 #else
-								//E [VY36 M] JackBB 2015/10/12 Kernel standardization							
+								
 
 								mt_set_gpio_out(pn547_dev->ven_gpio, GPIO_OUT_ONE);
 								mt_set_gpio_out(pn547_dev->firm_gpio, GPIO_OUT_ONE);
@@ -692,7 +692,7 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 								dev_info(&pn547_dev->client->dev,	"%s power on with firmware, irq=%d\n", __func__, atomic_read(&pn547_dev->irq_enabled));
 						} else if (arg == 1) {
 								/* power on */
-								//S [VY36 M] JackBB 2015/10/12 Kernel standardization			
+								
 #if defined(PN547_USE_KERNEL_STD)			
 								ret = mt_nfc_pinctrl_select(gpctrl, st_eint_l);		
 								ret = mt_nfc_pinctrl_select(gpctrl, st_ven_h);
@@ -702,7 +702,7 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 										pn547_enable_irq(nfc_irq);
 								}									
 #else								
-								//E [VY36 M] JackBB 2015/10/12 Kernel standardization			
+								
 								mt_set_gpio_out(pn547_dev->firm_gpio, GPIO_OUT_ZERO);
 								mt_set_gpio_out(pn547_dev->ven_gpio, GPIO_OUT_ONE);
 								usleep_range(10000, 10000);
@@ -714,7 +714,7 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 								dev_info(&pn547_dev->client->dev, "%s power on, irq=%d\n", __func__, atomic_read(&pn547_dev->irq_enabled));
 						} else if (arg == 0) {
 								/* power off */
-								//S [VY36 M] JackBB 2015/10/12 Kernel standardization			
+								
 #if defined(PN547_USE_KERNEL_STD)	
 								if (atomic_read(&pn547_dev->irq_enabled) == 1) {
 										pn547_disable_irq(nfc_irq);
@@ -724,7 +724,7 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 								ret = mt_nfc_pinctrl_select(gpctrl, st_eint_l);		
 								ret = mt_nfc_pinctrl_select(gpctrl, st_ven_l);								
 #else
-			 					//E [VY36 M] JackBB 2015/10/12 Kernel standardization								
+			 					
 								if (atomic_read(&pn547_dev->irq_enabled) == 1) {
 										mt_eint_mask(CUST_EINT_IRQ_NFC_NUM);
 										atomic_set(&pn547_dev->irq_enabled, 0);
@@ -746,7 +746,7 @@ static long pn547_dev_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 								return -EINVAL;
 						}
 						
-						return ret;//[VY36 M] JackBB 2015/10/12 Kernel standardization			
+						return ret;
 						
 						break;
 				default:
@@ -762,7 +762,7 @@ static int pn547_probe(struct i2c_client *client, const struct i2c_device_id *id
 		int ret;		
 		struct pn547_dev *pn547_dev;
 		struct pn547_i2c_platform_data *platform_data;
-		struct device_node *node;//[VY36 M] JackBB 2015/10/12 Kernel standardization			
+		struct device_node *node;
 		
 		printk("NFC -> pn547_probe++++\n");
 		
@@ -777,7 +777,7 @@ static int pn547_probe(struct i2c_client *client, const struct i2c_device_id *id
 				return -ENODEV;
 		}
 		
-		//S [VY36 M] JackBB 2015/10/12 Kernel standardization			
+		
 #if defined(PN547_USE_KERNEL_STD)			
 	
 	ret = mt_nfc_pinctrl_select(gpctrl, st_irq_init);
@@ -860,7 +860,7 @@ static int pn547_probe(struct i2c_client *client, const struct i2c_device_id *id
         printk(KERN_DEBUG "%s :I2CDMAWriteBuf_pa %d, I2CDMAReadBuf_pa,%d\n", __func__, I2CDMAWriteBuf_pa, I2CDMAReadBuf_pa);
 		#endif
 
-		//S [VY36 M] JackBB 2015/10/12 Kernel standardization
+		
 #if defined(PN547_USE_KERNEL_STD)
 		/*  NFC IRQ settings     */
 		node = of_find_compatible_node(NULL, NULL, "mediatek, IRQ_NFC-eint");
@@ -888,7 +888,7 @@ static int pn547_probe(struct i2c_client *client, const struct i2c_device_id *id
 			}
 		}	
 #else		
-		//E [VY36 M] JackBB 2015/10/12 Kernel standardization
+		
 		/* request irq. the irq is set whenever the chip has data available
 		* for reading. it is cleared when all data has been read.
 		*/
@@ -969,7 +969,7 @@ static int __init pn547_dev_init(void)
 		pr_info("Loading pn547 driver\n");
    	i2c_register_board_info(NFC_I2C_BUSNUM, &nfc_board_info, 1);
    	
-   	platform_driver_register(&mtk_nfc_platform_driver);//[VY36 M] JackBB 2015/10/12 Kernel standardization
+   	platform_driver_register(&mtk_nfc_platform_driver);
    	
 		return i2c_add_driver(&pn547_driver);
 }

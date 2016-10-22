@@ -184,11 +184,11 @@ int ccci_get_fo_setting(char item[], unsigned int *val)
 		ccci_value = ccci_fos_default_setting[i].value;
 
 		// Depend on project id to return current value
-		// VY36, VY37 & VY38 => 14
+		
 		// VY39 & VY40 => 9	
 		if (!strcmp(ccci_name, "MTK_MD1_SUPPORT")) {
 
-			// VY36, 37 & 38
+			
 			if (cci_prj_id == 0 || cci_prj_id == 1 || cci_prj_id == 2)
 			{
 				ccci_value = 14;	

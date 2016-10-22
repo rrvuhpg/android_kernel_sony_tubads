@@ -102,8 +102,11 @@
 /* Battery Logging Entry */
 /* ////////////////////////////////////////////////////////////////////////////// */
 int Enable_BATDRV_LOG = BAT_LOG_CRTI;
+//CEI comment start//
+//MTK security patch: ANDROID-28085222
 /* static struct proc_dir_entry *proc_entry; */
-char proc_bat_data[32];
+//char proc_bat_data[32];
+//CEI comment end//
 
 /* ///////////////////////////////////////////////////////////////////////////////////////// */
 /* // Smart Battery Structure */
@@ -497,22 +500,25 @@ void wake_up_bat3(void)
 }
 EXPORT_SYMBOL(wake_up_bat3);
 
-
+//CEI comment start//
+//MTK security patch: ANDROID-28085222
 static ssize_t bat_log_write(struct file *filp, const char __user *buff, size_t len, loff_t *data)
 {
-	if (copy_from_user(&proc_bat_data, buff, len)) {
+	char proc_bat_data;
+
+	if ((len <= 0) || copy_from_user(&proc_bat_data, buff, 1)) {
 		battery_log(BAT_LOG_FULL, "bat_log_write error.\n");
 		return -EFAULT;
 	}
 
-	if (proc_bat_data[0] == '1') {
+	if (proc_bat_data == '1') {
 		battery_log(BAT_LOG_CRTI, "enable battery driver log system\n");
 		Enable_BATDRV_LOG = 1;
-	} else if (proc_bat_data[0] == '2') {
+	} else if (proc_bat_data == '2') {
 		battery_log(BAT_LOG_CRTI, "enable battery driver log system:2\n");
 		Enable_BATDRV_LOG = 2;
 //CEI comment start//
-	} else if (proc_bat_data[0] == '3') {
+	} else if (proc_bat_data == '3') {
 		battery_log(BAT_LOG_CRTI, "enable battery driver log system:3\n");
 		Enable_BATDRV_LOG = 3;
 //CEI comment end//
@@ -523,6 +529,7 @@ static ssize_t bat_log_write(struct file *filp, const char __user *buff, size_t 
 
 	return len;
 }
+//CEI comment end
 
 static const struct file_operations bat_proc_fops = {
 	.write = bat_log_write,
@@ -1882,6 +1889,34 @@ signed int cei_add_voltage_buffer(int input_voltage)
 static int last_chg_status = POWER_SUPPLY_STATUS_UNKNOWN;
 //CEI comment end//
 
+//CEI comment start//
+#include <mt-plat/battery_meter_hal.h>
+extern BATTERY_METER_CONTROL battery_meter_ctrl;
+int is_charger_exist_and_charging(void)
+{
+#if 1 //MTK provided condition
+    int gFG_is_charging = 0;
+
+    if (battery_meter_ctrl != NULL)
+	battery_meter_ctrl(BATTERY_METER_CMD_GET_HW_FG_CURRENT_SIGN, &gFG_is_charging);
+
+    if(BMT_status.charger_exist == KAL_TRUE && gFG_is_charging ==1)
+        return 1;
+    else
+        return 0;
+#else // CEI modification's condition
+    kal_bool chgfull_status = KAL_FALSE;
+
+    battery_charging_control(CHARGING_CMD_GET_CHARGING_STATUS, &chgfull_status);
+
+    if( (BMT_status.charger_exist == KAL_TRUE) && (chgfull_status ==KAL_FALSE) )
+        return 1;
+    else
+        return 0;
+#endif
+}
+//CEI comment end//
+
 static void mt_battery_update_EM(struct battery_data *bat_data)
 {
 //CEI comment start//
@@ -1937,7 +1972,15 @@ static void mt_battery_update_EM(struct battery_data *bat_data)
 		bat_data->BAT_CAPACITY = PRESENT_SOC;
 	}
 	else  //MTK original code
-	bat_data->BAT_CAPACITY = BMT_status.UI_SOC2;
+	{
+//CEI comment start//
+			//bat_data->BAT_CAPACITY = BMT_status.UI_SOC2;
+		if(BMT_status.UI_SOC2 >=99 && BMT_status.bat_full == KAL_FALSE && is_charger_exist_and_charging())
+			bat_data->BAT_CAPACITY = 99;
+		else
+			bat_data->BAT_CAPACITY = BMT_status.UI_SOC2;
+//CEI comment end//
+	}
 //CEI comment end//
 
 	bat_data->BAT_TemperatureR = BMT_status.temperatureR;	/* API */

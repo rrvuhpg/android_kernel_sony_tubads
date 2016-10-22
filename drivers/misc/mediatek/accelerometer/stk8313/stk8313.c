@@ -28,7 +28,10 @@
 //#include <linux/earlysuspend.h>   //androidM
 #include <linux/platform_device.h>
 #include <asm/atomic.h>
-
+#include <linux/gpio.h>
+#include <linux/interrupt.h>
+#include <linux/pm_wakeup.h>
+#include <linux/input.h>
 
 #include <cust_acc.h>
 //#include <linux/hwmsensor.h>//androidM
@@ -142,7 +145,6 @@ static struct acc_init_info stk8313_init_info = {
     #endif
 #endif
 
-
 #if 1	//hh: protect client->addr 
 static struct mutex stk8313_i2c_mutex;
 #endif
@@ -161,6 +163,8 @@ static struct mutex stk8313_i2c_mutex;
 #define STK8313_DATA_LEN        6
 #define STK8313_DEV_NAME        "STK8313"
 /*----------------------------------------------------------------------------*/
+static const char *shake_idev_name = "acc_shake_event";
+
 static const struct i2c_device_id stk8313_i2c_id[] = {{STK8313_DEV_NAME,0},{}};
 //static struct i2c_board_info __initdata i2c_stk8313={ I2C_BOARD_INFO("STK8313", 0x22)};   //androidM
 //static struct i2c_board_info __initdata i2c_stk8313={ I2C_BOARD_INFO("STK8313", 0x48)};
@@ -217,6 +221,7 @@ struct stk8313_i2c_data {
     struct i2c_client *client;
     struct acc_hw *hw;
     struct hwmsen_convert   cvt;
+    struct input_dev *shake_idev;
     
     /*misc*/
     struct data_resolution *reso;
@@ -242,8 +247,9 @@ struct stk8313_i2c_data {
     /*early suspend*/
 #if defined(CONFIG_HAS_EARLYSUSPEND)
     struct early_suspend    early_drv;
-#endif     
+#endif
     //atomic_t				event_since_en;
+	atomic_t				recv_reg; // for access i2c
 };
 /*----------------------------------------------------------------------------*/
 #define STK8313_MAX_DRIVER_OFFSET	512
@@ -351,6 +357,27 @@ static struct data_resolution stk8313_offset_resolution = {{3, 9}, 256};
 
 /*--------------------ADXL power control function----------------------------------*/
 
+#if 1    // for Doze mode
+struct tilt_config {
+	u8 intsu;
+	u8 mode;
+	u8 sr;
+	u8 range;
+	u8 intmap;
+	u8 tilt;
+	u8 pdet;
+};
+#define IRQ_GPIO_NUM 13
+
+static int read_tilt_config(struct stk8313_i2c_data *obj, struct tilt_config *cfg);
+
+//int g_iSTH = 2; //default is 1.375g
+int g_iSTH = 3; //default is 1.5g
+int g_iSamRate = 0;
+int g_iIRQCnt = 0;
+
+#endif
+
 int hwmsen_read_byte_sr(struct i2c_client *client, u8 addr, u8 *data)
 {
    u8 buf;
@@ -455,7 +482,7 @@ int hwmsen_read_block_sr(struct i2c_client *client, u8 addr, u8 *data)
     return 0;
 }
 
-static void STK8313_power(struct acc_hw *hw, unsigned int on) 
+static int STK8313_power(struct acc_hw *hw, unsigned int on)
 {
 	static unsigned int power_on = 0;
 
@@ -486,8 +513,12 @@ static void STK8313_power(struct acc_hw *hw, unsigned int on)
 			}			  
 		}
 	}
+	power_on = on;
+	return 0;
+#else
+	power_on = on;
+	return -ENOENT;
 #endif
-	power_on = on;    
 }
 /*----------------------------------------------------------------------------*/
 //this function here use to set resolution and choose sensitivity
@@ -1449,7 +1480,8 @@ static int STK831X_SetDelay(struct i2c_client *client, u8 delay)
 //low power
 
 /*---------------------------------------------------------------------------*/
-static int STK8313_SetPowerMode(struct i2c_client *client, bool enable)
+#if 0
+static int STK8313_SetPowerMode_locked(struct i2c_client *client, bool enable)
 {
 	u8 databuf[2];    
 	int res = 0;
@@ -1515,6 +1547,422 @@ static int STK8313_SetPowerMode(struct i2c_client *client, bool enable)
 	
 	return STK8313_SUCCESS;    
 }
+#endif
+
+#define STK8313_REG_TILT   0x06
+#define STK8313_REG_INTSU  0x09
+#define STK8313_REG_MODE  0x0A
+#define STK8313_REG_SR     0x0b
+#define STK8313_REG_RANGE  0x16
+#define STK8313_REG_INTMAP 0x18
+#define STK8313_REG_PDET   0x0c
+
+//#define ALL_AXIS_SHAKE (6 << 5)   //xy
+#define ALL_AXIS_SHAKE (7 << 5)   //xyz
+//#define ALL_AXIS_SHAKE (2 << 5)     //only y 
+#define INT_PUSH_PULL  (1 << 6)
+#define MODE_ACTIVE    (1 << 0)
+#define S_RATE_50HZ    (3 << 0)
+#define S_RATE_100HZ    (2 << 0)
+//#define SHAKE_THRESH   (0 << 0)     // 1.125g
+#define SHAKE_THRESH   (2 << 0)   // 1.375g
+#define SHAKE_THRESH_M (7 << 0)
+//#define SHAKE_IRQ_INT2 (6 << 5)   //xy
+#define SHAKE_IRQ_INT2 (7 << 5) //xyz
+#define SHAKE_STATUS		(1 << 7)
+
+
+#define ALL_AXIS_TAP  (4 << 5) // X and Y enable, Z disable;  b100 < 5
+//#define ALL_AXIS_TAP  (5 << 5) // only Y enable; b101 < 5
+#define TAP_INT_ENABLE	(1 << 2)
+//#define TAP_THRESH		(3 << 0) // +/- 187.5 mg
+//#define TAP_THRESH		(1 << 0) // +/- 62.5 mg
+#define TAP_THRESH		(2 << 0) // +/- 62.5*2 mg
+#define TAP_THRESH_M (0x1F << 0)
+#define TAP_IRQ_INT2  (1 << 2)
+#define TAP_STATUS		(1 << 5)
+#define ALERT_STATUS	(1 << 6)
+
+#define RETRY 10
+
+static int read_retry(struct i2c_client *client, u8 reg, u8 *data)
+{
+	int rc, i;
+
+	for (i = 0; i < RETRY; i++) {
+		rc = hwmsen_read_byte(client, reg, data);
+		if (!rc)
+			break;
+	}
+	if (rc)
+		dev_err(&client->dev, "%s: reg %02x, rc = %d", __func__,
+				reg, rc);
+	return rc;
+}
+
+static int write_retry(struct i2c_client *client, u8 reg, u8 data)
+{
+	int rc, i;
+
+	for (i = 0; i < RETRY; i++) {
+		rc = hwmsen_write_byte(client, reg, data);
+		if (!rc)
+			break;
+	}
+	if (rc)
+		dev_err(&client->dev, "%s: reg %02x, val %02x, rc = %d",
+				__func__, reg, data, rc);
+	return rc;
+}
+
+
+static int read_tilt_config(struct stk8313_i2c_data *obj,
+	struct tilt_config *cfg)
+{
+	int rc;
+
+	memset(cfg, 0, sizeof(*cfg));
+
+    rc = read_retry(obj->client, STK8313_REG_INTSU, &cfg->intsu);   //0x09
+	if (rc)
+		goto err;
+	//rc = hwmsen_read_byte(obj->client, STK8313_REG_SR, &cfg->sr);
+	rc = read_retry(obj->client, STK8313_REG_SR, &cfg->sr); //0x0b
+	if (rc)
+		goto err;
+	//rc = hwmsen_read_byte(obj->client, STK8313_REG_RANGE, &cfg->range);
+    rc = read_retry(obj->client, STK8313_REG_RANGE, &cfg->range);   //0x16
+	if (rc)
+		goto err;
+	//rc = hwmsen_read_byte(obj->client, STK8313_REG_INTMAP, &cfg->intmap);
+    rc = read_retry(obj->client, STK8313_REG_INTMAP, &cfg->intmap); //0x18
+	if (rc)
+		goto err;
+	//rc = hwmsen_read_byte(obj->client, STK8313_REG_TILT, &cfg->tilt);
+    rc = read_retry(obj->client, STK8313_REG_TILT, &cfg->tilt); //0x06
+	if (rc)
+		goto err;
+
+    rc = read_retry(obj->client, STK8313_REG_MODE, &cfg->mode); //0x0A
+	if (rc)
+		goto err;
+
+    rc = read_retry(obj->client, STK8313_REG_PDET, &cfg->pdet); //0x0C
+err:
+	if (rc)
+		dev_err(&obj->client->dev, "%s = %d\n", __func__, rc);
+	return rc;
+}
+
+static int stk8313_setup_shake_detection(struct stk8313_i2c_data *obj,
+	bool enable)
+{
+	int rc;
+	u8 x;
+	struct tilt_config cfg;
+
+
+	Printhh("[%s] enable = %#x \n", __FUNCTION__, enable);
+
+	//dev_info(&obj->client->dev, "%s, enable %d\n", __func__, enable);
+	dev_dbg(&obj->client->dev, "%s, enable %d\n", __func__, enable);
+	rc = read_tilt_config(obj, &cfg);
+	if (rc)
+		goto err;
+	rc = write_retry(obj->client, STK8313_REG_MODE, 0);
+	if (rc)
+		goto err;
+	if (enable) {
+		cfg.intmap |= SHAKE_IRQ_INT2;   //(6 << 5); 0x18
+		cfg.intsu |= ALL_AXIS_SHAKE;    //(6 << 5); 0x09
+		//cfg.mode |= INT_PUSH_PULL;  // (1 << 6)
+		x = cfg.sr & 7;
+		//if (x > S_RATE_50HZ)    //(3 << 0)
+		
+#if 0		
+		if (x != S_RATE_50HZ)    //(3 << 0)
+			cfg.sr = (cfg.sr & ~7) | S_RATE_50HZ;
+        
+                g_iSamRate = S_RATE_50HZ;
+#endif
+		if (x != S_RATE_100HZ)    //(2 << 0)
+			cfg.sr = (cfg.sr & ~7) | S_RATE_100HZ;
+        
+                g_iSamRate = S_RATE_100HZ;
+
+		//if (x != S_RATE_100HZ)
+		//	cfg.sr = (cfg.sr & ~7) | S_RATE_100HZ;  //(2 << 0)	; 0x0b
+		//cfg.range = (cfg.range & ~SHAKE_THRESH_M) | SHAKE_THRESH;   //SHAKE_THRESH_M (3 << 0);SHAKE_THRESH   (0 << 0); 0x16
+		cfg.range = (cfg.range & ~SHAKE_THRESH_M) | g_iSTH;   //SHAKE_THRESH_M (3 << 0);SHAKE_THRESH   (0 << 0); 0x16
+
+	} else {
+		cfg.intmap &= ~SHAKE_IRQ_INT2;
+		cfg.intsu &= ~ALL_AXIS_SHAKE;
+		//cfg.mode &= ~INT_PUSH_PULL;
+	}
+//	rc = hwmsen_write_byte(obj->client, STK8313_REG_MODE, 0);   //0x0A
+//	if (rc)
+//		goto err;
+//	rc = hwmsen_write_byte(obj->client, STK8313_REG_INTMAP, cfg.intmap);    //0x18
+	rc = write_retry(obj->client, STK8313_REG_INTMAP, cfg.intmap);
+	if (rc)
+		goto err;
+//	rc = hwmsen_write_byte(obj->client, STK8313_REG_INTSU, cfg.intsu);  //0x09
+	rc = write_retry(obj->client, STK8313_REG_INTSU, cfg.intsu);
+	if (rc)
+		goto err;
+//	rc = hwmsen_write_byte(obj->client, STK8313_REG_SR, cfg.sr);    //0x0b
+	rc = write_retry(obj->client, STK8313_REG_SR, cfg.sr);
+	if (rc)
+		goto err;
+//	rc = hwmsen_write_byte(obj->client, STK8313_REG_RANGE, cfg.range);  //0x16
+//	if (rc)
+//		goto err;
+//	rc = hwmsen_write_byte(obj->client, STK8313_REG_MODE, cfg.mode);    //0x0A
+	rc = write_retry(obj->client, STK8313_REG_RANGE, cfg.range);    //0x16
+	if (rc)
+		goto err;
+err:
+	if (rc)
+		dev_err(&obj->client->dev, "%s = %d\n", __func__, rc);
+	return rc;
+}
+
+
+#if 0
+static int stk8313_setup_tap_detection(struct stk8313_i2c_data *obj,
+	bool enable)
+{
+	int rc;
+	u8 x;
+
+	struct tilt_config cfg;
+
+
+	Printhh("[%s] enable = %#x \n", __FUNCTION__, enable);
+    
+	//dev_info(&obj->client->dev, "%s, enable %d\n", __func__, enable);
+    dev_dbg(&obj->client->dev, "%s, enable %d\n", __func__, enable);
+	rc = read_tilt_config(obj, &cfg);
+	if (rc)
+		goto err;
+	rc = write_retry(obj->client, STK8313_REG_MODE, 0);
+	if (rc)
+		goto err;    
+	if (enable) {
+		cfg.intmap |= TAP_IRQ_INT2;   //(1 << 2); 0x18
+		cfg.intsu |= TAP_INT_ENABLE;    //(1 << 2); 0x09
+		cfg.pdet = ALL_AXIS_TAP; // (4 << 5); 0x0c
+		//cfg.pdet |= TAP_THRESH; // (3 << 0); 0x0c
+		cfg.pdet |= TAP_THRESH; // (2 << 0); 0x0c
+		//cfg.mode |= INT_PUSH_PULL;  // (1 << 6)
+		//Printhh("[%s] enable = %#x , cfg.mode = %#x\n", __FUNCTION__, enable, cfg.mode);
+
+		x = cfg.sr & 7;
+		//if (x > S_RATE_50HZ)    //(3 << 0)
+		//	cfg.sr = (cfg.sr & ~7) | S_RATE_50HZ;
+		if (x != S_RATE_50HZ)
+			cfg.sr = (cfg.sr & ~7) | S_RATE_50HZ;  //(2 << 0)	; 0x0b
+		g_iSamRate = S_RATE_50HZ;
+		//cfg.range = (cfg.range & ~SHAKE_THRESH_M) | SHAKE_THRESH;   //SHAKE_THRESH_M (3 << 0);SHAKE_THRESH   (0 << 0); 0x16
+
+	} else {
+		cfg.intmap &= ~TAP_IRQ_INT2;
+		cfg.intsu &= ~TAP_INT_ENABLE;
+		//cfg.pdet &= ~(0xff);
+		cfg.pdet = 0x0;
+		//cfg.mode &= ~INT_PUSH_PULL;
+		//Printhh("[%s] enable = %#x , cfg.mode = %#x\n", __FUNCTION__, enable, cfg.mode);
+	}
+	rc = write_retry(obj->client, STK8313_REG_INTMAP, cfg.intmap);
+	if (rc)
+		goto err;
+	rc = write_retry(obj->client, STK8313_REG_INTSU, cfg.intsu);
+	if (rc)
+		goto err;
+	rc = write_retry(obj->client, STK8313_REG_SR, cfg.sr);  //0x0b
+	if (rc)
+		goto err;
+	rc = write_retry(obj->client, STK8313_REG_PDET, cfg.pdet);  //0x0c
+	//if (rc)
+	//	goto err;
+	//Printhh("[%s] set STK8313_REG_MODE enable = %#x , cfg.mode = %#x\n", __FUNCTION__, enable, cfg.mode);
+	//rc = write_retry(obj->client, STK8313_REG_MODE, cfg.mode);  //0x0a
+	//if (rc)
+	//	goto err;
+
+err:
+	if (rc)
+		dev_err(&obj->client->dev, "%s = %d\n", __func__, rc);
+	return rc;
+}
+#endif
+
+
+enum acc_client {
+	REQ_ACC_DATA = 1 << 0,
+	REQ_SHAKE_SENSOR = 1 << 1,
+	REQ_TAP_SENSOR = 1 << 2,
+};
+
+struct stk8313_op_mode {
+	int req;
+	int saved_req;
+	struct mutex lock;
+};
+
+static struct stk8313_op_mode stk8313_op_mode;
+
+static int vote_op_mode_locked(struct i2c_client *client, bool enable,
+	enum acc_client request)
+{
+	int req;
+	struct stk8313_i2c_data *obj = i2c_get_clientdata(client);
+	int rc = 0;
+#if 1
+	int iDelayTime = 300;
+	struct tilt_config cfg;
+#endif
+
+
+	req = stk8313_op_mode.req;
+	Printhh("[%s] req = %#x , request=%#x, enable=%#x\n", __FUNCTION__, req, request, enable);
+
+	if (enable)
+		stk8313_op_mode.req |= request;
+	else
+		stk8313_op_mode.req &= ~request;
+
+	Printhh("[%s] stk8313_op_mode.req = %#x \n", __FUNCTION__, stk8313_op_mode.req);
+
+	dev_info(&client->dev, "%s: request 0x%02x, was 0x%02x\n", __func__,
+			stk8313_op_mode.req, req);
+
+	if (req != stk8313_op_mode.req) {
+#if 1
+	Printhh("[%s] call disable_irq()\n", __FUNCTION__);
+        disable_irq(gpio_to_irq(IRQ_GPIO_NUM));
+#endif
+        enable = !!stk8313_op_mode.req;
+
+	rc = write_retry(obj->client, STK8313_REG_MODE, 0);
+	if (rc) {
+		dev_err(&client->dev, "%s: unable set mode 0\n",
+				__func__);
+		goto err;
+	}
+
+	if (!(req & REQ_SHAKE_SENSOR) &&
+			(stk8313_op_mode.req & REQ_SHAKE_SENSOR)) {
+		stk8313_setup_shake_detection(obj, true);
+		//stk8313_setup_tap_detection(obj, true);
+	}else if (!(req & REQ_TAP_SENSOR) &&
+			(stk8313_op_mode.req & REQ_TAP_SENSOR)) {
+		//stk8313_setup_tap_detection(obj, true);
+	} else if ((req & REQ_SHAKE_SENSOR) &&
+			!(stk8313_op_mode.req & REQ_SHAKE_SENSOR)) {
+		stk8313_setup_shake_detection(obj, false);
+		//stk8313_setup_tap_detection(obj, false);
+	} else if ((req & REQ_TAP_SENSOR) &&
+			!(stk8313_op_mode.req & REQ_TAP_SENSOR)) {
+		//stk8313_setup_tap_detection(obj, false);
+	}
+
+	if (enable) {
+#if 0
+		u8 mode = MODE_ACTIVE | ((req & REQ_SHAKE_SENSOR)
+			? INT_PUSH_PULL : 0);
+#endif
+		u8 mode = MODE_ACTIVE | ((stk8313_op_mode.req & (REQ_SHAKE_SENSOR | REQ_TAP_SENSOR))
+			? INT_PUSH_PULL : 0);
+		//Printhh("[%s] stk8313_op_mode.req = %#x, REQ_SHAKE_SENSOR =  %#x,  (REQ_SHAKE_SENSOR|REQ_TAP_SENSOR)%#x\n", __FUNCTION__, stk8313_op_mode.req, stk8313_op_mode.req & (REQ_SHAKE_SENSOR), stk8313_op_mode.req & (REQ_SHAKE_SENSOR | REQ_TAP_SENSOR));
+		//Printhh("[%s] mode = %#x\n", __FUNCTION__, mode);
+
+		rc = write_retry(obj->client, STK8313_REG_MODE, mode);
+		if (rc) {
+			dev_err(&client->dev,
+					"%s: unable set mode 0x%02x\n",
+					__func__, mode);
+			goto err;
+		}
+		dev_dbg(&obj->client->dev, "%s mode 0x%02x\n",
+				__func__, mode);
+		rc = STK831X_SetVD(obj->client);
+#if 1            
+                if(g_iSamRate == S_RATE_50HZ){
+                    //iDelayTime = (1000/50) * 15 = 300;
+                    iDelayTime = 300;
+                }
+                else if(g_iSamRate == S_RATE_100HZ){
+                    //iDelayTime = (1000/100) * 15 = 150;
+                    iDelayTime = 150;
+                }
+                else{
+                    iDelayTime = 300;
+                }
+		//Printhh("[%s] g_iSamRate = %d, call msleep(%d)\n", __FUNCTION__, g_iSamRate, iDelayTime);
+		msleep(iDelayTime);
+                    
+		rc = read_tilt_config(obj, &cfg);
+		if (rc)
+			goto err;
+#endif
+	}
+
+#if 1
+	Printhh("[%s] call enable_irq()\n", __FUNCTION__);
+	enable_irq(gpio_to_irq(IRQ_GPIO_NUM));
+#endif
+	sensor_power = enable;
+    }
+
+     return rc;
+err:
+
+#if 1
+	Printhh("[%s] call enable_irq()\n", __FUNCTION__);
+	enable_irq(gpio_to_irq(IRQ_GPIO_NUM));
+#endif
+
+    return rc;
+}
+
+static int vote_op_mode(struct i2c_client *client, bool enable,
+	enum acc_client request)
+{
+	int rc;
+
+
+        Printhh("[%s] enter..\n", __FUNCTION__);
+	mutex_lock(&stk8313_op_mode.lock);
+	rc = vote_op_mode_locked(client, enable, request);
+	mutex_unlock(&stk8313_op_mode.lock);
+	return rc;
+}
+
+static int op_mode_suspend(struct i2c_client *client, bool suspend)
+{
+	int rc;
+
+
+        Printhh("[%s] enter..\n", __FUNCTION__);
+	mutex_lock(&stk8313_op_mode.lock);
+	if (suspend) {
+		stk8313_op_mode.saved_req = stk8313_op_mode.req;
+		rc = vote_op_mode_locked(client, false, REQ_ACC_DATA);
+	} else {
+		rc = vote_op_mode_locked(client, true,
+				stk8313_op_mode.saved_req);
+	}
+	mutex_unlock(&stk8313_op_mode.lock);
+	return rc;
+}
+
+static int STK8313_SetPowerMode(struct i2c_client *client, bool enable)
+{
+	return vote_op_mode(client, enable, REQ_ACC_DATA);
+}
+
 /*----------------------------------------------------------------------------*/
 //set detect range
 
@@ -1662,6 +2110,7 @@ static int STK8313_Init(struct i2c_client *client, int reset_cali)
 	//mdelay(g_iDelayStk);
 	//Printhh("[%s] stk8313 Init OK..\n", __FUNCTION__);
 
+
 	//Printhh("[%s] reset obj->fir sizeof()=%d\n", __FUNCTION__, (int)sizeof(obj->fir));
 	memset(&obj->fir, 0x00, sizeof(obj->fir));
 
@@ -1713,17 +2162,22 @@ static int STK8313_ReadSensorData(struct i2c_client *client, char *buf, int bufs
 		return -2;
 	}
 
+	mutex_lock(&stk8313_op_mode.lock);
 	//if(sensor_power == FALSE)
 	if(sensor_power == false)   //androidM
 	{
-		res = STK8313_SetPowerMode(client, true);
+//		res = STK8313_SetPowerMode(client, true);
+		res = vote_op_mode_locked(client, true, REQ_ACC_DATA);
 		if(res)
 		{
 			GSE_ERR("Power on stk8313 error %d!\n", res);
 		}
 	}
 
-	if( (res = STK8313_ReadData(client, obj->data)) )
+//	if( (res = STK8313_ReadData(client, obj->data)) )
+	res = STK8313_ReadData(client, obj->data);
+	mutex_unlock(&stk8313_op_mode.lock);
+	if(res)
 	{        
 		GSE_ERR("I2C error: ret value=%d", res);
 		return -3;
@@ -1774,16 +2228,21 @@ static int STK8313_ReadRawData(struct i2c_client *client, char *buf)
 	}
 
 //	if(sensor_power == FALSE)
+	mutex_lock(&stk8313_op_mode.lock);
 	if(sensor_power == false)
 	{
-		res = STK8313_SetPowerMode(client, true);
+//		res = STK8313_SetPowerMode(client, true);
+		res = vote_op_mode_locked(client, true, REQ_ACC_DATA);
 		if(res)
 		{
 			GSE_ERR("Power on stk8313 error %d!\n", res);
 		}
 	}
 	
-	if( (res = STK8313_ReadData(client, obj->data)) )
+	//if( (res = STK8313_ReadData(client, obj->data)) )
+	res = STK8313_ReadData(client, obj->data);
+	mutex_unlock(&stk8313_op_mode.lock);
+	if(res)
 	{        
 		GSE_ERR("I2C error: ret value=%d", res);
 		return EIO;
@@ -2363,6 +2822,229 @@ static ssize_t show_status_value(struct device_driver *ddri, char *buf)
 	}
 	return len;    
 }
+
+static int print_tilt_config(struct tilt_config *cfg, char *buf, size_t size)
+{
+	return scnprintf(buf, size,
+//		"INTSU %02x SR %02x RANGE %02x INTMAP %02x TILT %02x\n",
+//		cfg->intsu, cfg->sr, cfg->range, cfg->intmap, cfg->tilt);    
+		"INTSU %02x SR %02x RANGE %02x INTMAP %02x TILT %02x MODE %02x PDET %02x\n",
+		cfg->intsu, cfg->sr, cfg->range, cfg->intmap, cfg->tilt, cfg->mode, cfg->pdet);    
+}
+
+static ssize_t show_tilt_config(struct device_driver *ddri, char *buf)
+{
+	int rc;
+	struct tilt_config cfg;
+	struct stk8313_i2c_data *obj = obj_i2c_data;
+
+	rc = read_tilt_config(obj, &cfg);
+	if (rc)
+		goto err;
+	rc = print_tilt_config(&cfg, buf, PAGE_SIZE);
+err:
+	return rc;
+}
+
+static ssize_t store_tilt_config(struct device_driver *ddri,
+	const char *buf, size_t count)
+{
+	struct stk8313_i2c_data *obj = obj_i2c_data;
+	int rc;
+
+
+	dev_dbg(&obj->client->dev, "%s: enable %c\n", __func__, *buf);
+	Printhh("[%s] enter.. *buf = %#x\n", __FUNCTION__, (*buf));
+	rc = vote_op_mode(obj->client, *buf == '1', REQ_SHAKE_SENSOR);
+	return rc ? rc : count;
+}
+
+
+static ssize_t show_pm_relax(struct device_driver *ddri, char *buf)
+{
+	struct stk8313_i2c_data *obj = obj_i2c_data;
+	u8 x;
+	int rc = hwmsen_read_byte(obj->client, STK8313_REG_TILT, &x);
+
+
+	Printhh("[%s] enter.. call pm_relax() allow systen enter suspend..\n", __FUNCTION__);
+	pm_relax(&obj->client->dev);
+	if (rc)
+		goto err;
+	dev_info(&obj->client->dev, "%s 0x%02x\n", __func__, x);
+	rc = scnprintf(buf, PAGE_SIZE, "%x", x);
+err:
+	return rc;
+}
+
+
+static ssize_t store_reg(struct device_driver *ddri,
+	const char *buf, size_t count)
+{
+	struct stk8313_i2c_data *obj = obj_i2c_data;
+	unsigned int reg, val;
+	u8 x;
+	int rc = sscanf(buf, "%x,%x", &val, &reg);
+
+	if (rc == 2) {
+		//dev_info(&obj->client->dev, "writing %02x to %02x\n", val, reg);
+		dev_dbg(&obj->client->dev, "writing %02x to %02x\n", val, reg);
+        
+		rc = hwmsen_write_byte(obj->client, reg, val);
+		if (rc)
+			goto err;
+		rc = hwmsen_read_byte(obj->client, reg, &x);
+		//dev_info(&obj->client->dev, "read back %02x from %02x\n", x, reg);
+		dev_dbg(&obj->client->dev, "read back %02x from %02x\n", x, reg);
+	} else {
+		dev_err(&obj->client->dev, "%s: EINVAL", __func__);
+		rc = -EINVAL;
+	}
+err:
+	return rc ? rc : count;
+}
+
+
+#if 1
+static ssize_t store_sth(struct device_driver *ddri,	const char *buf, size_t count)
+{
+	//struct stk8313_i2c_data *obj = obj_i2c_data;
+	int iSth;
+	//ssize_t res = 0;
+    
+
+	sscanf(buf, "%d", &iSth);
+	Printhh("[%s] enter.. iSth = %d\n", __FUNCTION__, iSth);
+        g_iSTH = iSth;
+        
+	return count;
+}
+#endif
+
+
+#if 1//for factory test
+static ssize_t show_result_shake(struct device_driver *ddri, char *buf)
+{
+    int len = 0;
+
+
+    Printhh("[%s] g_iIRQCnt = %d \n", __FUNCTION__, g_iIRQCnt);
+    len += snprintf(buf+len, PAGE_SIZE-len, "%d\n", g_iIRQCnt);
+    //Printhh("[%s] len = %d\n", __FUNCTION__, len);
+
+    g_iIRQCnt = 0;  //read clear
+    return len;
+}
+/*----------------------------------------------------------------------------*/
+static ssize_t store_start_shake(struct device_driver *ddri, const char *buf, size_t count)
+{
+    struct stk8313_i2c_data *obj = obj_i2c_data;
+    int iStart = 0;
+    int rc;
+
+
+    sscanf(buf, "%d", &iStart);
+    Printhh("[%s] enter.. iStart = %d\n", __FUNCTION__, iStart);
+
+    if(iStart == 1){
+        g_iIRQCnt = 0;
+
+	rc = vote_op_mode(obj->client, true, REQ_SHAKE_SENSOR);
+	Printhh("[%s] rc = %#x, count=%d \n", __FUNCTION__, rc, (int)count);
+	return rc ? rc : count;
+    }
+    else if(iStart == 0){
+	rc = vote_op_mode(obj->client, false, REQ_SHAKE_SENSOR);
+	Printhh("[%s] rc = %#x, count=%d \n", __FUNCTION__, rc, (int)count);
+	return rc ? rc : count;
+    }
+
+    return count;
+}
+/*----------------------------------------------------------------------------*/
+#endif
+
+
+// for access i2c +[
+/*----------------------------------------------------------------------------*/
+static ssize_t stk831x_show_send(struct device_driver *ddri, char *buf)
+{
+    return 0;
+}
+/*----------------------------------------------------------------------------*/
+static ssize_t stk831x_store_send(struct device_driver *ddri, const char *buf, size_t count)
+{
+	//struct i2c_client *client = stk831x_i2c_client; 
+	struct i2c_client *client = stk8313_i2c_client; 
+    
+	struct stk8313_i2c_data *obj = i2c_get_clientdata(client);
+	int addr, cmd;
+	u8 dat;
+	u8 databuf[2];  
+
+	if (obj == NULL)
+	{
+		GSE_LOG("i2c_data obj is null!!\n");
+		return 0;
+	}	
+	else if(2 != sscanf(buf, "%x %x", &addr, &cmd))
+	{
+		GSE_LOG("invalid format: '%s'\n", buf);
+		return 0;
+	}
+
+	dat = (u8)cmd;
+	databuf[0] = addr;
+	databuf[1] = dat;
+	GSE_LOG("send(%02X, %02X) = %d\n", addr, cmd, 
+	hwmsen_write_byte(obj->client, addr, cmd));
+	//i2c_master_send(client, databuf, 0x2));
+	
+	return count;
+}
+/*----------------------------------------------------------------------------*/
+static ssize_t stk831x_show_recv(struct device_driver *ddri, char *buf)
+{
+	//struct i2c_client *client = stk831x_i2c_client;
+    struct i2c_client *client = stk8313_i2c_client; 
+	struct stk8313_i2c_data *obj = i2c_get_clientdata(client);
+	if (obj == NULL)
+	{
+		GSE_LOG("i2c_data obj is null!!\n");
+		return 0;
+	}	
+	return scnprintf(buf, PAGE_SIZE, "0x%04X\n", atomic_read(&obj->recv_reg));     	
+}
+/*----------------------------------------------------------------------------*/
+static ssize_t stk831x_store_recv(struct device_driver *ddri, const char *buf, size_t count)
+{
+	//struct i2c_client *client = stk831x_i2c_client;
+	struct i2c_client *client = stk8313_i2c_client; 
+	struct stk8313_i2c_data *obj = i2c_get_clientdata(client);
+	int addr;
+	u8 dat;
+    
+	if (obj == NULL)
+	{
+		GSE_LOG("i2c_data obj is null!!\n");
+		return 0;
+	}	
+	else if(1 != sscanf(buf, "%x", &addr))
+	{
+		GSE_LOG("invalid format: '%s'\n", buf);
+		return 0;
+	}
+#if 1
+	hwmsen_read_byte_sr(client, (u8)addr, &dat);
+
+	GSE_LOG("recv(%02X) = %d, 0x%02X\n", addr, dat, dat);
+	atomic_set(&obj->recv_reg, dat);	
+#endif
+	return count;
+}
+
+// for access i2c +]
+
 /*----------------------------------------------------------------------------*/
 static DRIVER_ATTR(chipinfo,             S_IRUGO, show_chipinfo_value,      NULL);
 static DRIVER_ATTR(sensordata,           S_IRUGO, show_sensordata_value,    NULL);
@@ -2373,7 +3055,17 @@ static DRIVER_ATTR(trace,      S_IWUSR | S_IRUGO, show_trace_value,         stor
 static DRIVER_ATTR(status,               S_IRUGO, show_status_value,        NULL);
 static DRIVER_ATTR(cali_miscTa,       S_IWUSR | S_IRUGO, show_cali_miscTa_value,          store_cali_miscTa_value);
 static DRIVER_ATTR(addskipcheckid,	 S_IWUSR | S_IRUGO, show_add_skip_checkId, store_add_skip_checkId);
+static DRIVER_ATTR(tilt, S_IWUSR | S_IRUGO,
+		show_tilt_config, store_tilt_config);
+static DRIVER_ATTR(pmrelax, S_IRUGO, show_pm_relax, NULL);
+static DRIVER_ATTR(reg, S_IWUSR, NULL, store_reg);
+static DRIVER_ATTR(sth, S_IWUSR, NULL, store_sth);
+static DRIVER_ATTR(shaketest, S_IWUSR | S_IRUGO, show_result_shake, store_start_shake);
 
+// for access i2c +[
+static DRIVER_ATTR(send,     S_IWUSR | S_IRUGO, stk831x_show_send,        stk831x_store_send);
+static DRIVER_ATTR(recv,     S_IWUSR | S_IRUGO, stk831x_show_recv,        stk831x_store_recv);
+// for access i2c +]
 /*----------------------------------------------------------------------------*/
 static struct driver_attribute *stk8313_attr_list[] = {
 	&driver_attr_chipinfo,     /*chip information*/
@@ -2385,6 +3077,14 @@ static struct driver_attribute *stk8313_attr_list[] = {
 	&driver_attr_status,        
 	&driver_attr_cali_miscTa,        
 	&driver_attr_addskipcheckid,
+	&driver_attr_tilt,
+	&driver_attr_pmrelax,
+	&driver_attr_reg,
+	&driver_attr_sth,
+	&driver_attr_shaketest,
+
+	&driver_attr_send,
+	&driver_attr_recv,
 };
 /*----------------------------------------------------------------------------*/
 static int stk8313_create_attr(struct device_driver *driver) 
@@ -2639,6 +3339,8 @@ static long stk8313_unlocked_ioctl(struct file *file, unsigned int cmd,
 				err = -EINVAL;
 				break;	  
 			}
+
+
 			#if 0
 			if(atomic_read(&obj->event_since_en) < 15){// wait 1000ms, auto-rotation 1000/66 = 15
 				atomic_add(1, &obj->event_since_en);	
@@ -2879,9 +3581,8 @@ static int stk8313_suspend(struct i2c_client *client, pm_message_t msg)
 {
 	struct stk8313_i2c_data *obj = i2c_get_clientdata(client);    
 	int err = 0;
-	u8  dat=0;
     
-	GSE_FUN();    
+	GSE_FUN();
         //Printhh("[%s] enter ..\n", __FUNCTION__);
 	if(msg.event == PM_EVENT_SUSPEND)
 	{   
@@ -2892,21 +3593,8 @@ static int stk8313_suspend(struct i2c_client *client, pm_message_t msg)
 			Printhh("[%s] null pointer!!\n", __FUNCTION__);
 			return -EINVAL;
 		}
-		//read old data
-		if ((err = hwmsen_read_byte_sr(client, STK8313_REG_MODE, &dat))) 
-		{
-           GSE_ERR("read ctl_reg1  fail!!\n");
-			Printhh("[%s] ead ctl_reg1  fail!!\n", __FUNCTION__);
-           return err;
-        }
-		dat = dat&0b11111110;//stand by mode
+		err = op_mode_suspend(client, true);
 		atomic_set(&obj->suspend, 1);
-		if( (err = hwmsen_write_byte(client, STK8313_REG_MODE, dat)) )
-		{
-			GSE_ERR("write power control fail!!\n");
-			Printhh("[%s] write power control fail!!\n", __FUNCTION__);
-			return err;
-		}        
 		STK8313_power(obj->hw, 0);
 	}
 	else{
@@ -2930,14 +3618,24 @@ static int stk8313_resume(struct i2c_client *client)
 		Printhh("[%s] null pointer!!\n", __FUNCTION__);
 		return -EINVAL;
 	}
-
+#if 0
 	STK8313_power(obj->hw, 1);
 	if( (err = STK8313_Init(client, 0)) )
 	{
 		GSE_ERR("initialize client fail!!\n");
 		Printhh("[%s] initialize client fail!!\n", __FUNCTION__);
 		return err;        
+#endif
+	if (!STK8313_power(obj->hw, 1)) {
+		if( (err = STK8313_Init(client, 0)) )
+		{
+			GSE_ERR("initialize client fail!!\n");
+			Printhh("[%s] initialize client fail!!\n",
+					__FUNCTION__);
+			return err;
+		}
 	}
+	op_mode_suspend(client, false);
 	atomic_set(&obj->suspend, 0);
 
 	return 0;
@@ -3159,6 +3857,76 @@ static int gsensor_get_data(int *x, int *y, int *z, int *status)
 }
 #endif //new arch
 
+static int si_count = 0;
+static irqreturn_t stk8313_irq_handler(int irq, void *handle)
+{
+	struct stk8313_i2c_data *obj = (struct stk8313_i2c_data *)handle;
+	u8 x;
+	int rc;
+
+
+       	Printhh("[%s] enter.. conut=%d \n", __FUNCTION__, ++si_count);
+
+	rc = hwmsen_read_byte(obj->client, STK8313_REG_TILT, &x);
+	if (rc) {
+		//dev_err(dev, "could not request tilt status %d\n", rc);
+		Printhh("[%s] could not request tilt status %d\n", __FUNCTION__, rc);
+
+	} else {
+#if 0
+		if( (x & TAP_STATUS) && !(x & ALERT_STATUS) ){
+			Printhh("[%s] has Tap event  x=%#x OOO\n", __FUNCTION__, x);
+			//Printhh("[%s] enter.. call pm_stay_awake() NOT allow systen enter suspend..\n", __FUNCTION__);
+			//pm_stay_awake(&obj->client->dev);
+			pm_wakeup_event(&obj->client->dev, 5000);
+			//Printhh("[%s] call acc_shake_report() \n", __FUNCTION__);
+			input_report_rel(obj->shake_idev, REL_MISC, 1);
+			input_sync(obj->shake_idev);
+		}else{
+			Printhh("[%s] Not Tap event x=%#x XXX\n", __FUNCTION__, x);
+		}
+#else
+		if( (x & SHAKE_STATUS) && !(x & ALERT_STATUS) ){
+                        g_iIRQCnt++;    //for factory test used
+			Printhh("[%s] has Shake event  x=%#x OOO\n", __FUNCTION__, x);
+			//Printhh("[%s] enter.. call pm_stay_awake() NOT allow systen enter suspend..\n", __FUNCTION__);
+			//pm_stay_awake(&obj->client->dev);
+            	        pm_wakeup_event(&obj->client->dev, 5000);
+			//Printhh("[%s] call acc_shake_report() \n", __FUNCTION__);
+			input_report_rel(obj->shake_idev, REL_MISC, 1);
+			input_sync(obj->shake_idev);
+		}else{
+			Printhh("[%s] Not Shake event x=%#x XXX\n", __FUNCTION__, x);
+		}
+#endif
+	}
+
+
+	return IRQ_HANDLED;
+}
+
+
+static int stk8313_setup_irq(struct stk8313_i2c_data *obj)
+{
+	int irqf;
+	int rc;
+	int irq = gpio_to_irq(IRQ_GPIO_NUM);
+	struct device *dev = &obj->client->dev;
+
+	irqf = IRQF_TRIGGER_FALLING | IRQF_ONESHOT | IRQF_NO_SUSPEND;
+
+	rc = devm_request_threaded_irq(dev, irq, NULL, stk8313_irq_handler,
+			irqf, dev_name(dev), obj);
+
+	if (rc) {
+		dev_err(dev, "could not request irq %d\n", irq);
+	} else {
+		enable_irq_wake(irq);
+		device_init_wakeup(dev, 1);
+		dev_dbg(dev, "requested irq %d\n", irq);
+	}
+	return rc;
+}
 
 /*----------------------------------------------------------------------------*/
 static int stk8313_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id)
@@ -3217,7 +3985,6 @@ static int stk8313_i2c_probe(struct i2c_client *client, const struct i2c_device_
 	atomic_set(&obj->fir_en, 1);
 	atomic_set(&obj->filter, 1);
 #endif
-
 	//atomic_set(&obj->event_since_en, 0);
 	stk8313_i2c_client = new_client;	
 
@@ -3225,11 +3992,30 @@ static int stk8313_i2c_probe(struct i2c_client *client, const struct i2c_device_
 	mutex_init(&stk8313_i2c_mutex);
 #endif
 
+	obj->shake_idev = devm_input_allocate_device(&client->dev);
+	if (!obj->shake_idev) {
+		dev_err(&client->dev, "unable to allocate input device\n");
+		err = -ENODEV;
+		goto exit_init_failed;
+	}
+	obj->shake_idev->name = shake_idev_name;
+	input_set_capability(obj->shake_idev, EV_REL, REL_MISC);
+	input_set_drvdata(obj->shake_idev, obj);
+	err = input_register_device(obj->shake_idev);
+	if (err < 0) {
+		dev_err(&client->dev, "unable to register input device: %d\n",
+				err);
+		goto exit_init_failed;
+	}
+
+	mutex_init(&stk8313_op_mode.lock);
+	stk8313_op_mode.req = 0;
+	stk8313_setup_irq(obj);
+
 	if( (err = STK8313_Init(new_client, 1)) )
 	{
 		goto exit_init_failed;
 	}
-	
 
 	//Printhh("[%s] call misc_register()\n", __FUNCTION__);
 	if( (err = misc_register(&stk8313_device)) )
@@ -3348,7 +4134,6 @@ static int stk8313_i2c_remove(struct i2c_client *client)
 
 	if( (err = hwmsen_detach(ID_ACCELEROMETER)) )
 	    
-
 	stk8313_i2c_client = NULL;
 	i2c_unregister_device(client);
 	kfree(i2c_get_clientdata(client));

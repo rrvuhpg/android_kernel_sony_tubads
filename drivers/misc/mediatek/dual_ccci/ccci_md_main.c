@@ -40,11 +40,11 @@
 #include <mt-plat/mtk_rtc.h>
 #endif
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/cciklog.h>
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 /* -------------ccci sbp feature define---------------------*/
 #ifdef CONFIG_MTK_MD_SBP_CUSTOM_VALUE
@@ -1087,14 +1087,14 @@ static void ccci_md_exception(int md_id, struct DEBUG_INFO_T *debug_info)
 	debug_info->type = ee_type;
 	md_ctlb[md_id]->md_ex_type = ee_type;
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #if CCI_KLOG_CRASH_SIZE
 	set_fault_state(FAULT_LEVEL_SUBSYSTEM, debug_info.type, "modem");
 #endif // #if CCI_KLOG_CRASH_SIZE
 	cklc_save_magic(KLOG_MAGIC_MARM_FATAL, KLOG_STATE_MARM_FATAL);
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	switch (ee_type) {
 	case MD_EX_TYPE_INVALID:

@@ -18,10 +18,10 @@
 
 #include "lens_info.h"
 #include "lens_list.h"
-//[VY36] ==>
+
 #include "vcm_pwrsvg.h"
 #include "kd_camera_hw.h"
-//[VY36] <==
+
 
 #define AF_DRVNAME "SUBAF"
 
@@ -325,7 +325,7 @@ static int AF_i2c_probe(struct i2c_client *client, const struct i2c_device_id *i
 		printk(" AFVDD power is enabled\n");
 
 #ifdef CONFIG_MTK_LENS_DW9714AF_SUPPORT
-	DW9714AF_WriteReg_Pwdn(client, 32768); //[VY36] Switch to Pwdn
+	DW9714AF_WriteReg_Pwdn(client, 32768); 
 #endif
 	LOG_INF("Attached!!\n");
 

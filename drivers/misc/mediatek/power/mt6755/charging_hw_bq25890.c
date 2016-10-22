@@ -772,6 +772,20 @@ static unsigned int charging_dump_register(void *data)
 	return status;
 }
 
+//CEI comment start//
+static unsigned int charging_dump_register_get_data(void *data)
+{
+	unsigned int status = STATUS_OK;
+	unsigned int val;
+
+	battery_log(BAT_LOG_FULL, "charging_dump_register\r\n");
+	val = bq25890_dump_register_get_data();
+	*(unsigned int *) data = val;
+
+	return status;
+}
+//CEI comment end//
+
 static unsigned int charging_enable(void *data)
 {
 	unsigned int status = STATUS_OK;
@@ -1739,7 +1753,8 @@ charging_hw_init, charging_dump_register, charging_enable, charging_set_cv_volta
 		charging_set_hiz_swchr, charging_get_bif_tbat, charging_set_ta20_reset,
 		charging_set_ta20_current_pattern,
 //CEI comment start//
-		charging_set_default_dpm
+		charging_set_default_dpm,
+		charging_dump_register_get_data
 //CEI comment end//
 		};
 

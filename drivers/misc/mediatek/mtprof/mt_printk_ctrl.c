@@ -75,10 +75,6 @@ static int __init init_mt_printk_ctrl(void)
 
 	mt_need_uart_console = 0;	/* default, no uart */
 
-#ifdef DISABLE_UART_LOG
-	mt_disable_uart();
-#endif
-
 	pe = proc_create("mtprintk", 0664, NULL, &mt_printk_ctrl_fops);
 	if (!pe)
 		return -ENOMEM;

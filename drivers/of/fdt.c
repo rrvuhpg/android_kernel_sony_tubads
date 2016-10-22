@@ -996,7 +996,7 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 		size -= phys_offset - base;
 		base = phys_offset;
 	}
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 	int ret = 0;
 
@@ -1016,7 +1016,7 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
 #else // #ifdef CONFIG_CCI_KLOG
 	memblock_add(base, size);
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 }
 
 int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,

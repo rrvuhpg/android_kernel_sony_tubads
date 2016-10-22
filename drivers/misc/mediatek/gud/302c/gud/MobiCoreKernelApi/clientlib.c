@@ -31,8 +31,13 @@
 LIST_HEAD(devices);
 /* lock used to prevent concurrent add/delete action on the device list */
 struct mutex device_mutex;
-struct mutex global_mutex;
 atomic_t device_usage = ATOMIC_INIT(0);
+
+/* global API lock used to prevent concurent access during not atomic
+ * communication read/write */
+struct mutex global_mutex;
+
+
 
 static struct mcore_device_t *resolve_device_id(uint32_t device_id)
 {
@@ -762,7 +767,6 @@ enum mc_result mc_free_wsm(uint32_t device_id, uint8_t *wsm)
 {
 	enum mc_result mc_result = MC_DRV_ERR_UNKNOWN;
 	struct mcore_device_t *device;
-
 
 	MCDRV_DBG_VERBOSE(mc_kapi, "===%s()===", __func__);
 

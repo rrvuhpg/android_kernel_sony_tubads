@@ -37,7 +37,7 @@
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CONFIG_CCI_KLOG
 #include <linux/cciklog.h>
 
@@ -47,7 +47,7 @@ extern void set_fault_state(int level, int type, const char* msg);
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CONFIG_CCI_KLOG
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 static const char *fault_name(unsigned int esr);
 
@@ -97,14 +97,14 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
 static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 			      unsigned int esr, struct pt_regs *regs)
 {
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	int level = FAULT_LEVEL_DATA_ABORT_64;
 	int type = esr & 63;
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 */
@@ -115,13 +115,13 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
 	bust_spinlocks(1);
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	set_fault_state(level, type, fault_name(esr));
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
 		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
 		 "paging request", addr);
@@ -141,7 +141,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 			    struct pt_regs *regs)
 {
 	struct siginfo si;
-//[VY36] ==> CCI KLog, added by Jimmy@CCI
+
 #ifdef CCI_KLOG_CRASH_SIZE
 #if CCI_KLOG_CRASH_SIZE
 	int level = FAULT_LEVEL_DATA_ABORT_64;
@@ -150,7 +150,7 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
 	kprintk("err_code=0x%X, fault_level=0x%X, fault_type=%d, fault_msg=%s\n", code, level, type, fault_name(esr));
 #endif // #if CCI_KLOG_CRASH_SIZE
 #endif // #ifdef CCI_KLOG_CRASH_SIZE
-//[VY36] <== CCI KLog, added by Jimmy@CCI
+
 
 	if (show_unhandled_signals && unhandled_signal(tsk, sig) &&
 	    printk_ratelimit()) {
